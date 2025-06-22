@@ -1,111 +1,277 @@
-// algorithms/huffman.js
+/**
+ * Huffman Coding Implementation
+ * Research-based implementation using frequency analysis and binary tree construction
+ */
 
-class HuffNode {
+class HuffmanNode {
   constructor(char, freq, left = null, right = null) {
-    this.char = char;
-    this.freq = freq;
-    this.left = left;
-    this.right = right;
+    this.char = char
+    this.freq = freq
+    this.left = left
+    this.right = right
+  }
+
+  isLeaf() {
+    return this.left === null && this.right === null
   }
 }
 
-function buildTree(freqMap) {
-  let nodes = Object.entries(freqMap).map(
-    ([char, freq]) => new HuffNode(char, freq)
-  );
-
-  while (nodes.length > 1) {
-    nodes.sort((a, b) => a.freq - b.freq);
-    const left = nodes.shift();
-    const right = nodes.shift();
-    const parent = new HuffNode(null, left.freq + right.freq, left, right);
-    nodes.push(parent);
+class MinHeap {
+  constructor() {
+    this.heap = []
   }
 
-  return nodes[0];
-}
-
-function buildCodes(node, prefix = "", map = {}) {
-  if (!node) return;
-  if (node.char !== null) map[node.char] = prefix;
-  buildCodes(node.left, prefix + "0", map);
-  buildCodes(node.right, prefix + "1", map);
-  return map;
-}
-
-function bitsToBuffer(bitString) {
-  const extra = (8 - (bitString.length % 8)) % 8;
-  bitString += "0".repeat(extra);
-  const bytes = [];
-  for (let i = 0; i < bitString.length; i += 8) {
-    bytes.push(parseInt(bitString.substr(i, 8), 2));
+  parent(i) {
+    return Math.floor((i - 1) / 2)
   }
-  return { buffer: Buffer.from(bytes), extra };
-}
-
-function bufferToBits(buffer, extra) {
-  let bitString = "";
-  for (const byte of buffer) {
-    bitString += byte.toString(2).padStart(8, "0");
+  leftChild(i) {
+    return 2 * i + 1
   }
-  return bitString.slice(0, bitString.length - extra);
-}
+  rightChild(i) {
+    return 2 * i + 2
+  }
 
-module.exports = {
-  compress(buffer) {
-    const data = buffer.toString("binary");
-    const freqMap = {};
-    for (const ch of data) {
-      freqMap[ch] = (freqMap[ch] || 0) + 1;
+  swap(i, j) {
+    ;[this.heap[i], this.heap[j]] = [this.heap[j], this.heap[i]]
+  }
+
+  insert(node) {
+    this.heap.push(node)
+    this.heapifyUp(this.heap.length - 1)
+  }
+
+  heapifyUp(i) {
+    while (i > 0 && this.heap[this.parent(i)].freq > this.heap[i].freq) {
+      this.swap(i, this.parent(i))
+      i = this.parent(i)
     }
-    const root = buildTree(freqMap);
-    const codes = buildCodes(root);
+  }
 
-    let bitString = "";
-    for (const ch of data) {
-      bitString += codes[ch];
+  extractMin() {
+    if (this.heap.length === 0) return null
+    if (this.heap.length === 1) return this.heap.pop()
+
+    const min = this.heap[0]
+    this.heap[0] = this.heap.pop()
+    this.heapifyDown(0)
+    return min
+  }
+
+  heapifyDown(i) {
+    let minIndex = i
+    const left = this.leftChild(i)
+    const right = this.rightChild(i)
+
+    if (left < this.heap.length && this.heap[left].freq < this.heap[minIndex].freq) {
+      minIndex = left
     }
-
-    const { buffer: compressedBuf, extra } = bitsToBuffer(bitString);
-    const codeMapBuffer = Buffer.from(JSON.stringify(codes));
-    const codeMapLengthBuffer = Buffer.alloc(4);
-    codeMapLengthBuffer.writeUInt32BE(codeMapBuffer.length, 0);
-
-    return {
-      buffer: Buffer.concat([
-        codeMapLengthBuffer,
-        codeMapBuffer,
-        Buffer.from([extra]),
-        compressedBuf,
-      ]),
-      explanation: "Huffman coding with encoded header and bitstream.",
-    };
-  },
-
-  decompress(buffer) {
-    const codeMapLength = buffer.readUInt32BE(0);
-    const codeMapBuffer = buffer.slice(4, 4 + codeMapLength);
-    const codes = JSON.parse(codeMapBuffer.toString());
-
-    const extra = buffer[4 + codeMapLength];
-    const dataBuf = buffer.slice(4 + codeMapLength + 1);
-
-    const bits = bufferToBits(dataBuf, extra);
-
-    const rev = {};
-    for (const [ch, code] of Object.entries(codes)) {
-      rev[code] = ch;
+    if (right < this.heap.length && this.heap[right].freq < this.heap[minIndex].freq) {
+      minIndex = right
     }
 
-    let current = "", result = "";
-    for (const bit of bits) {
-      current += bit;
-      if (rev[current]) {
-        result += rev[current];
-        current = "";
+    if (minIndex !== i) {
+      this.swap(i, minIndex)
+      this.heapifyDown(minIndex)
+    }
+  }
+
+  size() {
+    return this.heap.length
+  }
+}
+
+function buildFrequencyTable(data) {
+  const freq = {}
+  for (let i = 0; i < data.length; i++) {
+    const byte = data[i]
+    freq[byte] = (freq[byte] || 0) + 1
+  }
+  return freq
+}
+
+function buildHuffmanTree(frequencies) {
+  const heap = new MinHeap()
+
+  // Create leaf nodes for each character
+  for (const [char, freq] of Object.entries(frequencies)) {
+    heap.insert(new HuffmanNode(Number.parseInt(char), freq))
+  }
+
+  // Handle single character case
+  if (heap.size() === 1) {
+    const node = heap.extractMin()
+    return new HuffmanNode(null, node.freq, node, null)
+  }
+
+  // Build tree bottom-up
+  while (heap.size() > 1) {
+    const left = heap.extractMin()
+    const right = heap.extractMin()
+    const merged = new HuffmanNode(null, left.freq + right.freq, left, right)
+    heap.insert(merged)
+  }
+
+  return heap.extractMin()
+}
+
+function generateCodes(root) {
+  const codes = {}
+
+  function traverse(node, code) {
+    if (node.isLeaf()) {
+      codes[node.char] = code || "0" // Handle single character case
+      return
+    }
+    if (node.left) traverse(node.left, code + "0")
+    if (node.right) traverse(node.right, code + "1")
+  }
+
+  traverse(root, "")
+  return codes
+}
+
+function serializeTree(node) {
+  if (!node) return ""
+  if (node.isLeaf()) {
+    return "1" + String.fromCharCode(node.char)
+  }
+  return "0" + serializeTree(node.left) + serializeTree(node.right)
+}
+
+function deserializeTree(data, index = { value: 0 }) {
+  if (index.value >= data.length) return null
+
+  if (data[index.value] === "1") {
+    index.value++
+    const char = data.charCodeAt(index.value)
+    index.value++
+    return new HuffmanNode(char, 0)
+  } else {
+    index.value++
+    const left = deserializeTree(data, index)
+    const right = deserializeTree(data, index)
+    return new HuffmanNode(null, 0, left, right)
+  }
+}
+
+async function compress(data) {
+  try {
+    if (data.length === 0) {
+      return Buffer.from([])
+    }
+
+    // Build frequency table
+    const frequencies = buildFrequencyTable(data)
+
+    // Build Huffman tree
+    const root = buildHuffmanTree(frequencies)
+
+    // Generate codes
+    const codes = generateCodes(root)
+
+    // Serialize tree for storage
+    const serializedTree = serializeTree(root)
+
+    // Encode data
+    let encodedBits = ""
+    for (let i = 0; i < data.length; i++) {
+      encodedBits += codes[data[i]]
+    }
+
+    // Convert bits to bytes
+    const padding = 8 - (encodedBits.length % 8)
+    if (padding !== 8) {
+      encodedBits += "0".repeat(padding)
+    }
+
+    const encodedBytes = []
+    for (let i = 0; i < encodedBits.length; i += 8) {
+      const byte = Number.parseInt(encodedBits.substr(i, 8), 2)
+      encodedBytes.push(byte)
+    }
+
+    // Create compressed data format:
+    // [tree_length(4 bytes)][tree_data][padding(1 byte)][encoded_data]
+    const treeBuffer = Buffer.from(serializedTree, "utf8")
+    const treeLengthBuffer = Buffer.alloc(4)
+    treeLengthBuffer.writeUInt32BE(treeBuffer.length, 0)
+
+    const paddingBuffer = Buffer.from([padding === 8 ? 0 : padding])
+    const encodedBuffer = Buffer.from(encodedBytes)
+
+    return Buffer.concat([treeLengthBuffer, treeBuffer, paddingBuffer, encodedBuffer])
+  } catch (error) {
+    throw new Error(`Huffman compression failed: ${error.message}`)
+  }
+}
+
+async function decompress(compressedData) {
+  try {
+    if (compressedData.length === 0) {
+      return Buffer.from([])
+    }
+
+    let offset = 0
+
+    // Read tree length
+    const treeLength = compressedData.readUInt32BE(offset)
+    offset += 4
+
+    // Read serialized tree
+    const serializedTree = compressedData.slice(offset, offset + treeLength).toString("utf8")
+    offset += treeLength
+
+    // Read padding
+    const padding = compressedData[offset]
+    offset += 1
+
+    // Read encoded data
+    const encodedData = compressedData.slice(offset)
+
+    // Deserialize tree
+    const root = deserializeTree(serializedTree)
+
+    // Convert bytes back to bits
+    let bits = ""
+    for (let i = 0; i < encodedData.length; i++) {
+      bits += encodedData[i].toString(2).padStart(8, "0")
+    }
+
+    // Remove padding
+    if (padding > 0) {
+      bits = bits.slice(0, -padding)
+    }
+
+    // Decode using tree
+    const decoded = []
+    let current = root
+
+    for (let i = 0; i < bits.length; i++) {
+      if (current.isLeaf()) {
+        decoded.push(current.char)
+        current = root
+      }
+
+      if (bits[i] === "0") {
+        current = current.left
+      } else {
+        current = current.right
       }
     }
 
-    return Buffer.from(result, "binary");
-  },
-};
+    // Handle last character
+    if (current && current.isLeaf()) {
+      decoded.push(current.char)
+    }
+
+    return Buffer.from(decoded)
+  } catch (error) {
+    throw new Error(`Huffman decompression failed: ${error.message}`)
+  }
+}
+
+module.exports = {
+  compress,
+  decompress,
+  name: "Huffman Coding",
+}

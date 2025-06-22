@@ -1,33 +1,69 @@
-function compress(inputBuffer) {
-  const input = inputBuffer.toString('binary');
-  let output = '';
+/**
+ * Run-Length Encoding (RLE) Implementation
+ * Simple and efficient compression for data with repeated sequences
+ */
 
-  for (let i = 0; i < input.length;) {
-    let count = 1;
-    while (i + count < input.length && input[i] === input[i + count] && count < 255) {
-      count++;
+async function compress(data) {
+  try {
+    if (data.length === 0) {
+      return Buffer.from([])
     }
-    output += String.fromCharCode(count) + input[i];
-    i += count;
-  }
 
-  return {
-    buffer: Buffer.from(output, 'binary'),
-    explanation: 'RLE replaces runs of characters with (count, char) pairs.'
-  };
+    const compressed = []
+    let i = 0
+
+    while (i < data.length) {
+      const currentByte = data[i]
+      let count = 1
+
+      // Count consecutive identical bytes
+      while (i + count < data.length && data[i + count] === currentByte && count < 255) {
+        count++
+      }
+
+      // Store count and byte value
+      compressed.push(count)
+      compressed.push(currentByte)
+
+      i += count
+    }
+
+    return Buffer.from(compressed)
+  } catch (error) {
+    throw new Error(`RLE compression failed: ${error.message}`)
+  }
 }
 
-function decompress(compressedBuffer) {
-  const input = compressedBuffer.toString('binary');
-  let output = '';
+async function decompress(compressedData) {
+  try {
+    if (compressedData.length === 0) {
+      return Buffer.from([])
+    }
 
-  for (let i = 0; i < input.length; i += 2) {
-    const count = input.charCodeAt(i);
-    const char = input[i + 1];
-    output += char.repeat(count);
+    if (compressedData.length % 2 !== 0) {
+      throw new Error("Invalid RLE compressed data: odd length")
+    }
+
+    const decompressed = []
+
+    for (let i = 0; i < compressedData.length; i += 2) {
+      const count = compressedData[i]
+      const value = compressedData[i + 1]
+
+      // Repeat the value 'count' times
+      for (let j = 0; j < count; j++) {
+        decompressed.push(value)
+      }
+    }
+
+    return Buffer.from(decompressed)
+  } catch (error) {
+    throw new Error(`RLE decompression failed: ${error.message}`)
   }
-
-  return Buffer.from(output, 'binary');
 }
 
-module.exports = { compress, decompress };
+module.exports = {
+  compress,
+  decompress,
+  name: "Run-Length Encoding",
+}

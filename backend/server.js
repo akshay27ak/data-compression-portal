@@ -1,135 +1,144 @@
-const express = require("express");
-const multer = require("multer");
-const cors = require("cors");
-const fs = require("fs");
-const path = require("path");
-const { v4: uuidv4 } = require("uuid");
+const express = require("express")
+const cors = require("cors")
+const helmet = require("helmet")
+const compression = require("compression")
+const path = require("path")
+require("dotenv").config()
 
-const { readFile, writeFile, getFileSize, ensureDirExists } = require("./utils/fileManager");
+// Import routes
+const uploadRoutes = require("./routes/upload")
+const compressRoutes = require("./routes/compress")
+const downloadRoutes = require("./routes/download")
+const fileRoutes = require("./routes/file")
 
-const huffman = require("./algorithms/huffman");
-const rle = require("./algorithms/rle");
-const lz77 = require("./algorithms/lz77");
+// Import utilities
+const { cleanupOldFiles } = require("./utils/fileHandler")
 
-const app = express();
-app.use(cors({ origin: "http://localhost:3000", credentials: true }));
-app.use(express.json());
+const app = express()
+const PORT = process.env.PORT || 5000
 
-ensureDirExists("uploads");
-ensureDirExists("processed");
+// Security middleware
+app.use(helmet())
+app.use(compression())
 
-const upload = multer({ dest: "uploads/" });
+// CORS configuration
+app.use(
+  cors({
+    origin: [
+      "http://localhost:3000",
+      "http://localhost:3001",
+      /^https:\/\/.*\.vercel\.app$/,
+      /^https:\/\/.*\.netlify\.app$/,
+    ],
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  }),
+)
 
-const processedFiles = {}; // In-memory store
+// Body parsing middleware
+app.use(express.json({ limit: "100mb" }))
+app.use(express.urlencoded({ extended: true, limit: "100mb" }))
 
-// Upload
-app.post("/upload", upload.single("file"), (req, res) => {
-  const id = uuidv4();
-  const filePath = req.file.path;
-  const originalSize = getFileSize(filePath);
-  const fileName = req.file.originalname;
+// Create uploads directory if it doesn't exist
+const fs = require("fs")
+const uploadsDir = path.join(__dirname, "uploads")
+const processedDir = path.join(__dirname, "processed")
 
-  processedFiles[id] = { id, filePath, fileName, originalSize };
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true })
+}
+if (!fs.existsSync(processedDir)) {
+  fs.mkdirSync(processedDir, { recursive: true })
+}
 
-  res.json({ fileId: id, originalSize, fileName });
-});
+// Routes
+app.use("/upload", uploadRoutes)
+app.use("/compress", compressRoutes)
+app.use("/decompress", compressRoutes)
+app.use("/download", downloadRoutes)
+app.use("/file", fileRoutes)
 
-// Compress
-app.post('/compress', async (req, res) => {
-  try {
-    const { fileId, algorithm } = req.body;
-    const fileData = processedFiles[fileId];
-    if (!fileData) return res.status(404).json({ message: 'File not found.' });
+// Health check endpoint
+app.get("/health", (req, res) => {
+  res.json({
+    status: "OK",
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    algorithms: ["huffman", "rle", "lz77"],
+  })
+})
 
-    const inputBuffer = fs.readFileSync(fileData.filePath);
-    const start = Date.now();
+// Root endpoint
+app.get("/", (req, res) => {
+  res.json({
+    message: "File Compression & Decompression API",
+    version: "1.0.0",
+    endpoints: {
+      upload: "POST /upload",
+      compress: "POST /compress",
+      decompress: "POST /decompress",
+      download: "GET /download/:fileId",
+      health: "GET /health",
+    },
+    algorithms: ["huffman", "rle", "lz77"],
+  })
+})
 
-    const compressors = { rle, huffman, lz77 };
-    const compressor = compressors[algorithm];
-    if (!compressor) return res.status(400).json({ message: 'Unsupported algorithm' });
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error("Error:", err)
 
-    const result = compressor.compress(inputBuffer);
-    const end = Date.now();
-
-    const compressedFileId = `compressed-${Date.now()}-${fileId}`;
-    const outputPath = path.join(__dirname, 'processed', compressedFileId);
-    fs.writeFileSync(outputPath, result.buffer);
-
-    processedFiles[compressedFileId] = {
-      id: compressedFileId,
-      filePath: outputPath,
-      fileName: fileData.fileName,
-      originalSize: inputBuffer.length,
-      compressedSize: result.buffer.length
-    };
-
-    return res.json({
-      fileId: compressedFileId,
-      originalSize: inputBuffer.length,
-      compressedSize: result.buffer.length,
-      processingTime: ((end - start) / 1000).toFixed(3),
-      compressionRatio: Number(((1 - result.buffer.length / inputBuffer.length) * 100).toFixed(2)),
-      explanation: result.explanation
-    });
-
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ message: 'Compression failed: ' + err.message });
+  if (err.code === "LIMIT_FILE_SIZE") {
+    return res.status(413).json({
+      message: "File too large. Maximum size is 100MB.",
+    })
   }
-});
 
-
-// Decompress
-app.post("/decompress", (req, res) => {
-  try {
-    const { fileId, algorithm } = req.body;
-    const fileData = processedFiles[fileId];
-    if (!fileData) throw new Error("File not found");
-
-    const actualAlgorithm = fileData.algorithm || algorithm;
-    const decompressor = { huffman, rle, lz77 }[actualAlgorithm];
-    if (!decompressor) throw new Error("Invalid algorithm");
-
-    const start = process.hrtime();
-    const inputBuffer = readFile(fileData.filePath);
-    const decompressedBuffer = decompressor.decompress(inputBuffer);
-
-    const newId = uuidv4();
-    const outputFileName = `DECOMP_${newId}_${fileData.fileName}`;
-    const outPath = path.join("processed", outputFileName);
-    writeFile(outPath, decompressedBuffer);
-
-    const elapsed = process.hrtime(start);
-    const processingTime = (elapsed[0] + elapsed[1] / 1e9).toFixed(3);
-
-    processedFiles[newId] = {
-      id: newId,
-      filePath: outPath,
-      fileName: outputFileName,
-      decompressedSize: decompressedBuffer.length
-    };
-
-    res.json({
-      fileId: newId,
-      originalSize: inputBuffer.length,
-      decompressedSize: decompressedBuffer.length,
-      processingTime,
-      explanation: `Decompressed using ${actualAlgorithm}`
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Decompression failed: " + err.message });
+  if (err.code === "LIMIT_UNEXPECTED_FILE") {
+    return res.status(400).json({
+      message: "Unexpected file field.",
+    })
   }
-});
 
-// Download
-app.get("/download/:fileId", (req, res) => {
-  const fileData = processedFiles[req.params.fileId];
-  if (!fileData) return res.status(404).json({ message: "File not found" });
-  res.download(fileData.filePath, fileData.fileName);
-});
+  res.status(500).json({
+    message: "Internal server error",
+    error: process.env.NODE_ENV === "development" ? err.message : "Something went wrong",
+  })
+})
 
-// Start Server
-app.listen(5000, () => {
-  console.log("✅ Backend running at http://localhost:5000");
-});
+// 404 handler
+app.use("*", (req, res) => {
+  res.status(404).json({
+    message: "Endpoint not found",
+    availableEndpoints: ["/upload", "/compress", "/decompress", "/download/:fileId", "/health"],
+  })
+})
+
+// Cleanup old files every hour
+setInterval(
+  () => {
+    cleanupOldFiles()
+  },
+  60 * 60 * 1000,
+)
+
+// Graceful shutdown
+process.on("SIGTERM", () => {
+  console.log("SIGTERM received, shutting down gracefully")
+  process.exit(0)
+})
+
+process.on("SIGINT", () => {
+  console.log("SIGINT received, shutting down gracefully")
+  process.exit(0)
+})
+
+app.listen(PORT, () => {
+  console.log(`🚀 Compression API Server running on port ${PORT}`)
+//   console.log(`📁 Uploads directory: ${uploadsDir}`)
+//   console.log(`⚙️ Processed files directory: ${processedDir}`)
+//   console.log(`🔧 Available algorithms: huffman, rle, lz77`)
+})
+
+module.exports = app
