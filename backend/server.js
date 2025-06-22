@@ -27,6 +27,7 @@ app.use(
     origin: [
       "http://localhost:3000",
       "http://localhost:3001",
+      "https://data-compression-portal-tawny.vercel.app",
       /^https:\/\/.*\.vercel\.app$/,
       /^https:\/\/.*\.netlify\.app$/,
     ],
@@ -144,9 +145,6 @@ app.listen(PORT, () => {
   console.log(`🚀 Compression API Server running on port ${PORT}`)
   console.log(`📁 Uploads directory: ${uploadsDir}`)
   console.log(`⚙️ Processed files directory: ${processedDir}`)
-  console.log(`🔧 Available algorithms: huffman, rle, lz77, jpeg`)
-  console.log(`📸 JPEG compression creates .jpg files`)
-  console.log(`🔄 All algorithms support decompression`)
 })
 
 module.exports = app
