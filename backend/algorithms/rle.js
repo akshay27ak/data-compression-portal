@@ -1,36 +1,33 @@
-// algorithms/rle.js
+function compress(inputBuffer) {
+  const input = inputBuffer.toString('binary');
+  let output = '';
 
-module.exports = {
-  compress(buffer) {
-    const input = buffer.toString('binary'); // Read as binary
-    let compressed = '';
+  for (let i = 0; i < input.length;) {
     let count = 1;
-
-    for (let i = 1; i <= input.length; i++) {
-      if (input[i] === input[i - 1] && count < 255) {
-        count++;
-      } else {
-        compressed += String.fromCharCode(count) + input[i - 1];
-        count = 1;
-      }
+    while (i + count < input.length && input[i] === input[i + count] && count < 255) {
+      count++;
     }
-
-    return {
-      buffer: Buffer.from(compressed, 'binary'),
-      explanation: "Run-Length Encoding (RLE) works by replacing sequences of repeated bytes with a count followed by the byte itself. Best for repetitive data."
-    };
-  },
-
-  decompress(buffer) {
-    const input = buffer.toString('binary');
-    let output = '';
-
-    for (let i = 0; i < input.length; i += 2) {
-      const count = input.charCodeAt(i);
-      const char = input[i + 1];
-      output += char.repeat(count);
-    }
-
-    return Buffer.from(output, 'binary');
+    output += String.fromCharCode(count) + input[i];
+    i += count;
   }
-};
+
+  return {
+    buffer: Buffer.from(output, 'binary'),
+    explanation: 'RLE replaces runs of characters with (count, char) pairs.'
+  };
+}
+
+function decompress(compressedBuffer) {
+  const input = compressedBuffer.toString('binary');
+  let output = '';
+
+  for (let i = 0; i < input.length; i += 2) {
+    const count = input.charCodeAt(i);
+    const char = input[i + 1];
+    output += char.repeat(count);
+  }
+
+  return Buffer.from(output, 'binary');
+}
+
+module.exports = { compress, decompress };

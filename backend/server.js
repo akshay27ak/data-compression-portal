@@ -22,6 +22,7 @@ const upload = multer({ dest: "uploads/" });
 
 const processedFiles = {}; // In-memory store
 
+// Upload
 app.post("/upload", upload.single("file"), (req, res) => {
   const id = uuidv4();
   const filePath = req.file.path;
@@ -33,67 +34,69 @@ app.post("/upload", upload.single("file"), (req, res) => {
   res.json({ fileId: id, originalSize, fileName });
 });
 
-app.post("/compress", async (req, res) => {
+// Compress
+app.post('/compress', async (req, res) => {
   try {
     const { fileId, algorithm } = req.body;
     const fileData = processedFiles[fileId];
-    if (!fileData) throw new Error("File not found");
+    if (!fileData) return res.status(404).json({ message: 'File not found.' });
 
-    const start = process.hrtime();
+    const inputBuffer = fs.readFileSync(fileData.filePath);
+    const start = Date.now();
 
-    const inputBuffer = readFile(fileData.filePath);
+    const compressors = { rle, huffman, lz77 };
+    const compressor = compressors[algorithm];
+    if (!compressor) return res.status(400).json({ message: 'Unsupported algorithm' });
 
-    const compressor = { huffman, rle, lz77 }[algorithm];
-    if (!compressor) throw new Error("Invalid algorithm");
+    const result = compressor.compress(inputBuffer);
+    const end = Date.now();
 
-    const { buffer: compressedBuffer, explanation } = compressor.compress(inputBuffer);
+    const compressedFileId = `compressed-${Date.now()}-${fileId}`;
+    const outputPath = path.join(__dirname, 'processed', compressedFileId);
+    fs.writeFileSync(outputPath, result.buffer);
 
-    const newId = uuidv4();
-    const outPath = `processed/${newId}_${fileData.fileName}`;
-    writeFile(outPath, compressedBuffer);
-
-    const elapsed = process.hrtime(start);
-    const processingTime = (elapsed[0] + elapsed[1] / 1e9).toFixed(3);
-    const compressedSize = compressedBuffer.length;
-    const compressionRatio = Number(((1 - compressedSize / fileData.originalSize) * 100).toFixed(2));
-
-    processedFiles[newId] = {
-      id: newId,
-      filePath: outPath,
-      fileName: path.basename(outPath),
-      originalSize: fileData.originalSize,
-      compressedSize,
+    processedFiles[compressedFileId] = {
+      id: compressedFileId,
+      filePath: outputPath,
+      fileName: fileData.fileName,
+      originalSize: inputBuffer.length,
+      compressedSize: result.buffer.length
     };
 
-    res.json({
-      fileId: newId,
-      originalSize: fileData.originalSize,
-      compressedSize,
-      compressionRatio,
-      processingTime,
-      explanation,
+    return res.json({
+      fileId: compressedFileId,
+      originalSize: inputBuffer.length,
+      compressedSize: result.buffer.length,
+      processingTime: ((end - start) / 1000).toFixed(3),
+      compressionRatio: Number(((1 - result.buffer.length / inputBuffer.length) * 100).toFixed(2)),
+      explanation: result.explanation
     });
+
   } catch (err) {
-    res.status(500).json({ message: "Compression failed: " + err.message });
+    console.error(err);
+    return res.status(500).json({ message: 'Compression failed: ' + err.message });
   }
 });
 
+
+// Decompress
 app.post("/decompress", (req, res) => {
   try {
     const { fileId, algorithm } = req.body;
     const fileData = processedFiles[fileId];
     if (!fileData) throw new Error("File not found");
 
-    const start = process.hrtime();
-
-    const inputBuffer = readFile(fileData.filePath);
-    const decompressor = { huffman, rle, lz77 }[algorithm];
+    const actualAlgorithm = fileData.algorithm || algorithm;
+    const decompressor = { huffman, rle, lz77 }[actualAlgorithm];
     if (!decompressor) throw new Error("Invalid algorithm");
 
+    const start = process.hrtime();
+    const inputBuffer = readFile(fileData.filePath);
     const decompressedBuffer = decompressor.decompress(inputBuffer);
 
     const newId = uuidv4();
-    const outPath = `processed/${newId}_DECOMP_${fileData.fileName}`;
+    const outputFileName = `DECOMP_${newId}_${fileData.fileName}`;
+    const outPath = path.join("processed", outputFileName);
     writeFile(outPath, decompressedBuffer);
 
     const elapsed = process.hrtime(start);
@@ -102,8 +105,8 @@ app.post("/decompress", (req, res) => {
     processedFiles[newId] = {
       id: newId,
       filePath: outPath,
-      fileName: path.basename(outPath),
-      decompressedSize: decompressedBuffer.length,
+      fileName: outputFileName,
+      decompressedSize: decompressedBuffer.length
     };
 
     res.json({
@@ -111,19 +114,22 @@ app.post("/decompress", (req, res) => {
       originalSize: inputBuffer.length,
       decompressedSize: decompressedBuffer.length,
       processingTime,
-      explanation: `Decompressed using ${algorithm}`,
+      explanation: `Decompressed using ${actualAlgorithm}`
     });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: "Decompression failed: " + err.message });
   }
 });
 
+// Download
 app.get("/download/:fileId", (req, res) => {
   const fileData = processedFiles[req.params.fileId];
   if (!fileData) return res.status(404).json({ message: "File not found" });
   res.download(fileData.filePath, fileData.fileName);
 });
 
+// Start Server
 app.listen(5000, () => {
   console.log("✅ Backend running at http://localhost:5000");
 });

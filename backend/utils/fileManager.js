@@ -1,17 +1,28 @@
-const fs = require("fs");
-const path = require("path");
+const fs = require('fs');
+const path = require('path');
+
+function ensureDirExists(dir) {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir);
+  }
+}
+
+function readFile(filePath) {
+  return fs.readFileSync(filePath);
+}
+
+function writeFile(filePath, data) {
+  fs.writeFileSync(filePath, data);
+}
+
+function getFileSize(filePath) {
+  const stats = fs.statSync(filePath);
+  return stats.size;
+}
 
 module.exports = {
-  readFile(filePath) {
-    return fs.readFileSync(filePath);
-  },
-  writeFile(filePath, data) {
-    fs.writeFileSync(filePath, data);
-  },
-  getFileSize(filePath) {
-    return fs.statSync(filePath).size;
-  },
-  ensureDirExists(dir) {
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir);
-  }
+  ensureDirExists,
+  readFile,
+  writeFile,
+  getFileSize
 };
