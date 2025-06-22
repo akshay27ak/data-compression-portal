@@ -35,11 +35,18 @@ async function decompress(compressedData) {
 
     // Check if this is a JPEG image
     if (compressedData[0] === 0xff && compressedData[1] === 0xd8) {
-      // This is a JPEG image - convert to raw image data
+      // This is a JPEG image - convert to raw image data (PNG)
       return await decompressJpegImage(compressedData)
-    } else {
+    } else if (
+      compressedData[0] === 0x4c &&
+      compressedData[1] === 0x4f &&
+      compressedData[2] === 0x53 &&
+      compressedData[3] === 0x53
+    ) {
       // This is our custom lossy compressed data
       return decompressLossyData(compressedData)
+    } else {
+      throw new Error("Invalid JPEG compressed data format")
     }
   } catch (error) {
     throw new Error(`JPEG decompression failed: ${error.message}`)
@@ -83,17 +90,18 @@ async function compressImage(data) {
 
 async function decompressJpegImage(jpegData) {
   try {
-    // Convert JPEG back to raw image data (PNG format for lossless storage)
-    const rawImageBuffer = await sharp(jpegData).png().toBuffer()
-
-    // Add metadata header to indicate this is decompressed image data
-    const header = Buffer.from("DECOMP_IMG", "utf8")
-    const lengthBuffer = Buffer.alloc(4)
-    lengthBuffer.writeUInt32BE(rawImageBuffer.length, 0)
-
-    return Buffer.concat([header, lengthBuffer, rawImageBuffer])
+    // Convert JPEG back to PNG format (lossless storage of decompressed data)
+    const pngBuffer = await sharp(jpegData).png().toBuffer()
+    return pngBuffer
   } catch (error) {
-    throw new Error(`JPEG image decompression failed: ${error.message}`)
+    // Fallback to Jimp
+    try {
+      const image = await Jimp.read(jpegData)
+      const buffer = await image.getBufferAsync(Jimp.MIME_PNG)
+      return buffer
+    } catch (jimpError) {
+      throw new Error(`JPEG image decompression failed: ${error.message}`)
+    }
   }
 }
 

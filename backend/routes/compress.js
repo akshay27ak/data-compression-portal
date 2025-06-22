@@ -67,27 +67,32 @@ router.post("/", async (req, res) => {
     const endTime = Date.now()
     const processingTime = ((endTime - startTime) / 1000).toFixed(2)
 
-    // Save compressed file with appropriate extension
+    // Generate proper filename based on algorithm and original file
     const compressedFileId = uuidv4()
+    const originalName = path.parse(fileMetadata.originalName).name
+    const originalExt = path.parse(fileMetadata.originalName).ext
+
     let compressedFileName, compressedFilePath
 
     if (algorithm === "jpeg") {
-      // For JPEG, save as .jpg file
-      compressedFileName = `${compressedFileId}_compressed.jpg`
+      // JPEG creates .jpeg files (industry standard)
+      compressedFileName = `${originalName}_compressed.jpeg`
       compressedFilePath = path.join("processed", compressedFileName)
     } else {
-      // For other algorithms, save as .bin file
-      compressedFileName = `${compressedFileId}_compressed_${algorithm}.bin`
+      // Other algorithms create .bin files but store original extension in metadata
+      compressedFileName = `${originalName}_compressed_${algorithm}.bin`
       compressedFilePath = path.join("processed", compressedFileName)
     }
 
     fs.writeFileSync(compressedFilePath, compressedData)
 
-    // Save compressed file metadata
+    // Save compressed file metadata with original file info
     const compressedMetadata = {
       fileId: compressedFileId,
       originalFileId: fileId,
       originalName: fileMetadata.originalName,
+      originalExtension: originalExt, // Store original extension for decompression
+      originalMimeType: fileMetadata.mimeType, // Store original MIME type
       fileName: compressedFileName,
       filePath: compressedFilePath,
       algorithm: algorithm,
@@ -117,10 +122,13 @@ router.post("/", async (req, res) => {
       fileId: compressedFileId,
       originalSize: originalSize,
       compressedSize: compressedSize,
+      processedSize: compressedSize,
       processingTime: processingTime,
+      timeTaken: processingTime,
       compressionRatio: Number.parseFloat(compressedMetadata.compressionRatio),
       algorithm: algorithm,
       explanation: explanation,
+      fileName: compressedFileName, // Return the actual filename
       message: "File compressed successfully",
     })
   } catch (error) {
@@ -149,11 +157,19 @@ router.post("/decompress", async (req, res) => {
       })
     }
 
-    // Load file metadata
-    const metadataPath = path.join("uploads", `${fileId}.json`)
+    // Load file metadata - check both uploads and processed directories
+    let metadataPath = path.join("uploads", `${fileId}.json`)
+    let isFromProcessed = false
+
+    if (!fs.existsSync(metadataPath)) {
+      // Check in processed directory (for compressed files)
+      metadataPath = path.join("processed", `${fileId}.json`)
+      isFromProcessed = true
+    }
+
     if (!fs.existsSync(metadataPath)) {
       return res.status(404).json({
-        message: "File not found",
+        message: "File not found. Please upload a compressed file created by this system.",
       })
     }
 
@@ -162,11 +178,25 @@ router.post("/decompress", async (req, res) => {
 
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({
-        message: "Original file not found",
+        message: "Compressed file not found",
       })
     }
 
-    console.log(`📦 Starting decompression: ${algorithm} on ${fileMetadata.originalName}`)
+    // Verify this is a compressed file
+    if (isFromProcessed && fileMetadata.action !== "compress") {
+      return res.status(400).json({
+        message: "This file was not created by compression. Please upload a compressed file.",
+      })
+    }
+
+    // Verify algorithm matches
+    if (isFromProcessed && fileMetadata.algorithm !== algorithm) {
+      return res.status(400).json({
+        message: `This file was compressed with ${fileMetadata.algorithm}, but you selected ${algorithm}. Please select the correct algorithm.`,
+      })
+    }
+
+    console.log(`📦 Starting decompression: ${algorithm} on ${fileMetadata.fileName || fileMetadata.originalName}`)
     const startTime = Date.now()
 
     // Read compressed file
@@ -180,20 +210,34 @@ router.post("/decompress", async (req, res) => {
     const endTime = Date.now()
     const processingTime = ((endTime - startTime) / 1000).toFixed(2)
 
-    // Save decompressed file
+    // Generate proper filename for decompressed file
     const decompressedFileId = uuidv4()
     let decompressedFileName, decompressedFilePath
 
-    if (algorithm === "jpeg") {
-      // For JPEG decompression, save as .png (raw image data)
-      decompressedFileName = `${decompressedFileId}_decompressed.png`
-      decompressedFilePath = path.join("processed", decompressedFileName)
+    if (isFromProcessed && fileMetadata.originalName && fileMetadata.originalExtension) {
+      // Restore original filename and extension
+      const originalName = path.parse(fileMetadata.originalName).name
+      const originalExt = fileMetadata.originalExtension
+
+      if (algorithm === "jpeg") {
+        // JPEG decompression creates PNG files (lossless format)
+        decompressedFileName = `${originalName}_decompressed.png`
+      } else {
+        // Other algorithms restore to original extension
+        decompressedFileName = `${originalName}_decompressed${originalExt}`
+      }
     } else {
-      // For other algorithms, save as .bin file
-      decompressedFileName = `${decompressedFileId}_decompressed_${algorithm}.bin`
-      decompressedFilePath = path.join("processed", decompressedFileName)
+      // Fallback for files without proper metadata
+      const baseName = path.parse(fileMetadata.originalName || fileMetadata.fileName || "file").name
+
+      if (algorithm === "jpeg") {
+        decompressedFileName = `${baseName}_decompressed.png`
+      } else {
+        decompressedFileName = `${baseName}_decompressed.bin`
+      }
     }
 
+    decompressedFilePath = path.join("processed", decompressedFileName)
     fs.writeFileSync(decompressedFilePath, decompressedData)
 
     // Save decompressed file metadata
@@ -209,6 +253,10 @@ router.post("/decompress", async (req, res) => {
       processedSize: decompressedSize,
       processingTime: processingTime,
       timestamp: new Date().toISOString(),
+      // Preserve original file info if available
+      restoredFromCompression: isFromProcessed,
+      originalFileExtension: fileMetadata.originalExtension,
+      originalMimeType: fileMetadata.originalMimeType,
     }
 
     const decompressedMetadataPath = path.join("processed", `${decompressedFileId}.json`)
@@ -216,18 +264,27 @@ router.post("/decompress", async (req, res) => {
 
     console.log(`✅ Decompression completed: ${compressedSize} → ${decompressedSize} bytes`)
 
-    const explanation =
-      algorithm === "jpeg"
-        ? `JPEG decompression converted your compressed image back to raw image data (PNG format). Note: Some quality loss occurred during the original JPEG compression as it's a lossy format.`
-        : `Successfully decompressed your file using ${algorithm} algorithm. The original data has been perfectly restored with no quality loss.`
+    // Generate explanation based on algorithm and whether it was properly compressed
+    let explanation
+    if (algorithm === "jpeg") {
+      explanation = `JPEG decompression converted your compressed image back to PNG format. The original image data has been restored, though some quality loss occurred during the original JPEG compression.`
+    } else if (isFromProcessed) {
+      explanation = `Successfully decompressed your file using ${algorithm} algorithm. The original file has been perfectly restored with the original filename and extension.`
+    } else {
+      explanation = `Decompression completed using ${algorithm} algorithm. Note: For best results, upload files that were compressed using this system.`
+    }
 
     res.json({
       fileId: decompressedFileId,
       originalSize: compressedSize,
       decompressedSize: decompressedSize,
+      processedSize: decompressedSize,
       processingTime: processingTime,
+      timeTaken: processingTime,
       algorithm: algorithm,
       explanation: explanation,
+      fileName: decompressedFileName,
+      restoredOriginal: isFromProcessed,
       message: "File decompressed successfully",
     })
   } catch (error) {
@@ -244,28 +301,31 @@ function generateCompressionExplanation(algorithm, ratio, mimeType) {
 
   const explanations = {
     huffman: {
-      text: `Huffman coding achieved ${ratio}% compression by analyzing character frequencies in your text file. Common characters were assigned shorter codes, making this algorithm highly effective for text data.`,
-      image: `Huffman coding achieved ${ratio}% compression on your image. While not optimal for images due to uniform pixel distribution, it still provided compression by encoding frequent color values with shorter codes.`,
-      binary: `Huffman coding achieved ${ratio}% compression on your binary file by creating variable-length codes based on byte frequency patterns found in the data structure.`,
+      text: `Huffman coding achieved ${ratio}% compression by analyzing character frequencies in your text file. The compressed file is saved as .bin format but will restore to your original text file when decompressed.`,
+      image: `Huffman coding achieved ${ratio}% compression on your image. The compressed file is saved as .bin format but will restore to your original image file when decompressed.`,
+      binary: `Huffman coding achieved ${ratio}% compression on your binary file by creating variable-length codes. The compressed .bin file will restore to your original file format when decompressed.`,
     },
     rle: {
-      text: `Run-Length Encoding achieved ${ratio}% compression on your text file. This algorithm works best with repeated characters, so the compression ratio depends on consecutive identical characters in your text.`,
-      image: `Run-Length Encoding achieved ${ratio}% compression by efficiently encoding consecutive pixels of the same color. This algorithm excels with images containing large uniform areas.`,
-      binary: `Run-Length Encoding achieved ${ratio}% compression by replacing sequences of identical bytes with count-value pairs. The effectiveness depends on repetitive patterns in your binary data.`,
+      text: `Run-Length Encoding achieved ${ratio}% compression on your text file. The compressed .bin file contains the encoded data and will restore to your original text file when decompressed.`,
+      image: `Run-Length Encoding achieved ${ratio}% compression by efficiently encoding consecutive pixels. The compressed .bin file will restore to your original image when decompressed.`,
+      binary: `Run-Length Encoding achieved ${ratio}% compression by replacing repeated byte sequences. The compressed .bin file will restore to your original file when decompressed.`,
     },
     lz77: {
-      text: `LZ77 achieved ${ratio}% compression by finding and referencing repeated phrases and words in your text. This dictionary-based approach is excellent for text with recurring patterns.`,
-      image: `LZ77 achieved ${ratio}% compression by identifying repeated pixel patterns and replacing them with references to earlier occurrences. This works well for images with recurring visual elements.`,
-      binary: `LZ77 achieved ${ratio}% compression using its sliding window approach to find repeated byte sequences in your binary file. This general-purpose algorithm adapts well to various data patterns.`,
+      text: `LZ77 achieved ${ratio}% compression by finding repeated text patterns. The compressed .bin file contains dictionary references and will restore to your original text file when decompressed.`,
+      image: `LZ77 achieved ${ratio}% compression by identifying repeated pixel patterns. The compressed .bin file will restore to your original image when decompressed.`,
+      binary: `LZ77 achieved ${ratio}% compression using sliding window compression. The compressed .bin file will restore to your original file format when decompressed.`,
     },
     jpeg: {
-      text: `JPEG compression achieved ${ratio}% size reduction, but this algorithm is not recommended for text files as it's designed for photographic images and may introduce artifacts.`,
-      image: `JPEG compression achieved ${ratio}% size reduction by removing visual information that's less perceptible to human eyes. This lossy compression is specifically optimized for photographic images and creates industry-standard .jpg files.`,
-      binary: `JPEG compression achieved ${ratio}% size reduction, but this algorithm is not suitable for binary data and may cause data corruption. Use lossless algorithms for binary files.`,
+      text: `JPEG compression achieved ${ratio}% size reduction and created a .jpeg file. Note: This algorithm is designed for images, not text files.`,
+      image: `JPEG compression achieved ${ratio}% size reduction by creating an industry-standard .jpeg file. This can be opened in any image viewer and will decompress to PNG format if needed.`,
+      binary: `JPEG compression achieved ${ratio}% size reduction and created a .jpeg file. Note: This algorithm is designed for images, not binary data.`,
     },
   }
 
-  return explanations[algorithm]?.[fileType] || `${algorithm} achieved ${ratio}% compression on your file.`
+  return (
+    explanations[algorithm]?.[fileType] ||
+    `${algorithm} achieved ${ratio}% compression and saved the result appropriately.`
+  )
 }
 
 module.exports = router

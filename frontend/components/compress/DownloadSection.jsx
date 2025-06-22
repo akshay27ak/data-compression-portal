@@ -7,10 +7,45 @@ export default function DownloadSection({ result, fileName, fileId }) {
   const [isDownloading, setIsDownloading] = useState(false)
 
   const getDownloadFileName = () => {
+    // Use the filename from the result if available
+    if (result.fileName) {
+      return result.fileName
+    }
+
+    // Fallback to generating filename
     if (!fileName) return "processed_file"
+
     const nameWithoutExt = fileName.split(".").slice(0, -1).join(".")
-    const extension = result.action === "compress" ? "compressed" : "decompressed"
-    return `${nameWithoutExt}_${extension}_${result.algorithm}.bin`
+    const extension =
+      result.action === "compress"
+        ? result.algorithm === "jpeg"
+          ? "jpeg"
+          : "bin"
+        : result.algorithm === "jpeg"
+          ? "png"
+          : fileName.split(".").pop()
+
+    return `${nameWithoutExt}_${result.action}ed_${result.algorithm}.${extension}`
+  }
+
+  const getFileIcon = () => {
+    const filename = getDownloadFileName()
+    const ext = filename.split(".").pop()?.toLowerCase()
+
+    switch (ext) {
+      case "jpeg":
+      case "jpg":
+      case "png":
+        return "🖼️"
+      case "txt":
+        return "📄"
+      case "pdf":
+        return "📕"
+      case "bin":
+        return "🗜️"
+      default:
+        return "📄"
+    }
   }
 
   const handleDownload = async () => {
@@ -44,11 +79,13 @@ export default function DownloadSection({ result, fileName, fileId }) {
         {/* File Info */}
         <div className="bg-gray-50 rounded-lg p-4">
           <div className="flex items-center gap-3 mb-3">
-            <span className="text-2xl">📄</span>
+            <span className="text-2xl">{getFileIcon()}</span>
             <div>
               <p className="font-semibold text-gray-900">{getDownloadFileName()}</p>
               <p className="text-sm text-gray-500">
                 {result.action === "compress" ? "Compressed" : "Decompressed"} file
+                {result.algorithm === "jpeg" && result.action === "compress" && " (Standard JPEG format)"}
+                {result.algorithm === "jpeg" && result.action === "decompress" && " (PNG format)"}
               </p>
             </div>
           </div>
@@ -64,6 +101,43 @@ export default function DownloadSection({ result, fileName, fileId }) {
             </div>
           </div>
         </div>
+
+        {/* File Type Info */}
+        {result.algorithm === "jpeg" && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <p className="text-sm text-blue-800">
+              {result.action === "compress" ? (
+                <>
+                  <span className="font-medium">📸 JPEG File:</span> This .jpeg file can be opened in any image viewer
+                  or editor.
+                </>
+              ) : (
+                <>
+                  <span className="font-medium">🖼️ PNG File:</span> Decompressed to lossless PNG format for quality
+                  preservation.
+                </>
+              )}
+            </p>
+          </div>
+        )}
+
+        {result.algorithm !== "jpeg" && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+            <p className="text-sm text-green-800">
+              {result.action === "compress" ? (
+                <>
+                  <span className="font-medium">🗜️ Compressed File:</span> Upload this .bin file back to decompress and
+                  restore your original file.
+                </>
+              ) : (
+                <>
+                  <span className="font-medium">📄 Restored File:</span> Your original file has been restored with the
+                  correct extension.
+                </>
+              )}
+            </p>
+          </div>
+        )}
 
         {/* Download Button */}
         <button
@@ -83,7 +157,7 @@ export default function DownloadSection({ result, fileName, fileId }) {
           ) : (
             <>
               <span className="text-lg">⬇️</span>
-              <span>Download Processed File</span>
+              <span>Download {result.action === "compress" ? "Compressed" : "Decompressed"} File</span>
             </>
           )}
         </button>

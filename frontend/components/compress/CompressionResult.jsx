@@ -2,7 +2,7 @@
 
 export default function CompressionResult({ result }) {
   const formatFileSize = (bytes) => {
-    if (bytes === 0) return "0 Bytes"
+    if (bytes === 0 || isNaN(bytes) || bytes === undefined) return "0 Bytes"
     const k = 1024
     const sizes = ["Bytes", "KB", "MB", "GB", "TB"]
     const i = Math.floor(Math.log(bytes) / Math.log(k))
@@ -10,9 +10,14 @@ export default function CompressionResult({ result }) {
   }
 
   const getCompressionRatio = () => {
+    if (!result.originalSize || !result.processedSize || isNaN(result.originalSize) || isNaN(result.processedSize)) {
+      return "0.0"
+    }
+
     if (result.action === "compress") {
       return (((result.originalSize - result.processedSize) / result.originalSize) * 100).toFixed(1)
     } else {
+      // For decompression, show expansion ratio
       return (((result.processedSize - result.originalSize) / result.originalSize) * 100).toFixed(1)
     }
   }
@@ -28,11 +33,18 @@ export default function CompressionResult({ result }) {
 
   const getEfficiencyRating = () => {
     const ratio = Number.parseFloat(getCompressionRatio())
-    if (ratio >= 70) return { label: "Excellent", color: "green", icon: "🏆" }
-    if (ratio >= 50) return { label: "Very Good", color: "blue", icon: "⭐" }
-    if (ratio >= 30) return { label: "Good", color: "yellow", icon: "👍" }
-    if (ratio >= 15) return { label: "Fair", color: "orange", icon: "👌" }
-    return { label: "Poor", color: "red", icon: "⚠️" }
+    if (isNaN(ratio)) return { label: "Unknown", color: "gray", icon: "❓" }
+
+    if (result.action === "compress") {
+      if (ratio >= 70) return { label: "Excellent", color: "green", icon: "🏆" }
+      if (ratio >= 50) return { label: "Very Good", color: "blue", icon: "⭐" }
+      if (ratio >= 30) return { label: "Good", color: "yellow", icon: "👍" }
+      if (ratio >= 15) return { label: "Fair", color: "orange", icon: "👌" }
+      return { label: "Poor", color: "red", icon: "⚠️" }
+    } else {
+      // For decompression, success is just completing without errors
+      return { label: "Success", color: "green", icon: "✅" }
+    }
   }
 
   const efficiency = getEfficiencyRating()
@@ -51,7 +63,9 @@ export default function CompressionResult({ result }) {
         {/* Size Comparison */}
         <div className="grid grid-cols-2 gap-4">
           <div className="bg-blue-50 rounded-lg p-4 text-center">
-            <p className="text-xs text-blue-600 font-medium mb-1">ORIGINAL SIZE</p>
+            <p className="text-xs text-blue-600 font-medium mb-1">
+              {result.action === "compress" ? "ORIGINAL SIZE" : "COMPRESSED SIZE"}
+            </p>
             <p className="text-lg font-bold text-blue-800">{formatFileSize(result.originalSize)}</p>
           </div>
           <div
@@ -94,9 +108,13 @@ export default function CompressionResult({ result }) {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
             <div className="bg-white rounded-lg p-3 text-center">
-              <p className="text-gray-500 mb-1">Compression Ratio</p>
+              <p className="text-gray-500 mb-1">
+                {result.action === "compress" ? "Compression Ratio" : "Expansion Ratio"}
+              </p>
               <p className="font-bold text-gray-900">{getCompressionRatio()}%</p>
-              <p className="text-xs text-gray-400 mt-1">Space Saved</p>
+              <p className="text-xs text-gray-400 mt-1">
+                {result.action === "compress" ? "Space Saved" : "Size Increase"}
+              </p>
             </div>
             <div className="bg-white rounded-lg p-3 text-center">
               <p className="text-gray-500 mb-1">Algorithm Used</p>
@@ -105,9 +123,11 @@ export default function CompressionResult({ result }) {
             </div>
             <div className="bg-white rounded-lg p-3 text-center">
               <p className="text-gray-500 mb-1">Processing Speed</p>
-              <p className="font-bold text-gray-900">{result.timeTaken}s</p>
+              <p className="font-bold text-gray-900">{result.timeTaken || "0.00"}s</p>
               <p className="text-xs text-gray-400 mt-1">
-                {(result.originalSize / 1024 / Number.parseFloat(result.timeTaken)).toFixed(0)} KB/s
+                {result.originalSize && result.timeTaken && !isNaN(result.originalSize) && !isNaN(result.timeTaken)
+                  ? `${(result.originalSize / 1024 / Number.parseFloat(result.timeTaken || 1)).toFixed(0)} KB/s`
+                  : "N/A"}
               </p>
             </div>
           </div>
@@ -117,7 +137,7 @@ export default function CompressionResult({ result }) {
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <h5 className="font-medium text-blue-900 mb-2 flex items-center gap-2">
             <span>💡</span>
-            Why This Algorithm Performed {efficiency.label}ly
+            {result.action === "compress" ? "Compression" : "Decompression"} Analysis
           </h5>
           <p className="text-sm text-blue-800">{result.performanceExplanation}</p>
         </div>
@@ -127,8 +147,8 @@ export default function CompressionResult({ result }) {
           <div className="flex items-center gap-2">
             <span className="text-green-600">✅</span>
             <span className="text-sm font-medium text-green-800">
-              File {result.action}ed successfully using {result.algorithm.toUpperCase()} - Achieved{" "}
-              {getCompressionRatio()}% size reduction
+              File {result.action}ed successfully using {result.algorithm.toUpperCase()}
+              {result.action === "compress" && ` - Achieved ${getCompressionRatio()}% size reduction`}
             </span>
           </div>
         </div>

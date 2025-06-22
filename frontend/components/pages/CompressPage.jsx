@@ -24,21 +24,27 @@ export default function CompressPage() {
   const [downloadReady, setDownloadReady] = useState(false)
 
   const handleFileSelect = async (file) => {
+    // Reset all states when new file is selected
     setSelectedFile(file)
     setCompressionResult(null)
     setDownloadReady(false)
     setError("")
     setUploadedFileId(null)
+    setDetectedFileType(null)
 
-    if (!file) return
+    if (!file) {
+      // Reset algorithm to default when file is removed
+      setSelectedAlgorithm("huffman")
+      return
+    }
 
     // Detect file type
     const fileType = detectFileType(file)
     setDetectedFileType(fileType)
 
-    // Auto-suggest algorithm if enabled
+    // Auto-suggest algorithm if enabled (always refresh)
+    const suggestedAlgorithm = suggestAlgorithm(fileType)
     if (autoSuggest) {
-      const suggestedAlgorithm = suggestAlgorithm(fileType)
       setSelectedAlgorithm(suggestedAlgorithm)
     }
 
@@ -68,11 +74,22 @@ export default function CompressPage() {
       case "text":
         return "huffman"
       case "image":
-        return "jpeg" // Changed from "rle" to "jpeg" for images
+        return "jpeg"
       case "binary":
         return "lz77"
       default:
         return "huffman"
+    }
+  }
+
+  // Handle auto-suggest toggle change
+  const handleAutoSuggestChange = (enabled) => {
+    setAutoSuggest(enabled)
+
+    // If enabling auto-suggest and we have a detected file type, update algorithm
+    if (enabled && detectedFileType) {
+      const suggestedAlgorithm = suggestAlgorithm(detectedFileType)
+      setSelectedAlgorithm(suggestedAlgorithm)
     }
   }
 
@@ -119,12 +136,6 @@ export default function CompressPage() {
       return
     }
 
-    // Check if trying to decompress with JPEG
-    if (selectedAlgorithm === "jpeg") {
-      setError("JPEG decompression converts to raw image data. Use compress to create JPEG files.")
-      return
-    }
-
     setIsProcessing(true)
     setProcessingAction("decompress")
     setError("")
@@ -132,17 +143,21 @@ export default function CompressPage() {
     try {
       const result = await decompressFile(uploadedFileId, selectedAlgorithm)
 
-      // Format result for display
+      // Format result for display - Fixed parsing
       const formattedResult = {
         action: "decompress",
         originalSize: result.originalSize || selectedFile.size,
         processedSize: result.decompressedSize || result.processedSize,
         algorithm: selectedAlgorithm,
-        algorithmType: "Lossless",
+        algorithmType: selectedAlgorithm === "jpeg" ? "Lossy to Lossless" : "Lossless",
         timeTaken: result.processingTime || result.timeTaken,
         performanceExplanation:
           result.explanation ||
-          `Successfully decompressed your file using ${selectedAlgorithm} algorithm. The original data has been perfectly restored with no quality loss.`,
+          `Successfully decompressed your file using ${selectedAlgorithm} algorithm. ${
+            selectedAlgorithm === "jpeg"
+              ? "Converted to PNG format for lossless storage."
+              : "The original data has been perfectly restored."
+          }`,
         fileId: result.fileId || result.id,
       }
 
@@ -177,7 +192,7 @@ export default function CompressPage() {
       },
       jpeg: {
         text: `JPEG compression achieved ${ratio.toFixed(1)}% size reduction, but this algorithm is not recommended for text files as it's designed for photographic images and may introduce artifacts.`,
-        image: `JPEG compression achieved ${ratio.toFixed(1)}% size reduction by removing visual information that's less perceptible to human eyes. This lossy compression is specifically optimized for photographic images.`,
+        image: `JPEG compression achieved ${ratio.toFixed(1)}% size reduction by removing visual information that's less perceptible to human eyes. This lossy compression creates industry-standard .jpeg files that can be opened in any image viewer.`,
         binary: `JPEG compression achieved ${ratio.toFixed(1)}% size reduction, but this algorithm is not suitable for binary data and may cause data corruption. Use lossless algorithms for binary files.`,
       },
     }
@@ -203,7 +218,7 @@ export default function CompressPage() {
             selectedAlgorithm={selectedAlgorithm}
             onAlgorithmChange={setSelectedAlgorithm}
             autoSuggest={autoSuggest}
-            onAutoSuggestChange={setAutoSuggest}
+            onAutoSuggestChange={handleAutoSuggestChange}
             detectedFileType={detectedFileType}
           />
 
