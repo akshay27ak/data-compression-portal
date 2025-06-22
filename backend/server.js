@@ -65,7 +65,7 @@ app.get("/health", (req, res) => {
     status: "OK",
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
-    algorithms: ["huffman", "rle", "lz77"],
+    algorithms: ["huffman", "rle", "lz77", "jpeg"],
   })
 })
 
@@ -73,7 +73,7 @@ app.get("/health", (req, res) => {
 app.get("/", (req, res) => {
   res.json({
     message: "File Compression & Decompression API",
-    version: "1.0.0",
+    version: "1.5.0",
     endpoints: {
       upload: "POST /upload",
       compress: "POST /compress",
@@ -81,7 +81,13 @@ app.get("/", (req, res) => {
       download: "GET /download/:fileId",
       health: "GET /health",
     },
-    algorithms: ["huffman", "rle", "lz77"],
+    algorithms: ["huffman", "rle", "lz77", "jpeg"],
+    features: {
+      jpeg: "Creates .jpg files with industry-standard compression",
+      decompression: "Available for all algorithms including JPEG (converts to PNG)",
+      lossless: "Huffman, RLE, LZ77 provide perfect reconstruction",
+      lossy: "JPEG optimized for photographic images",
+    },
   })
 })
 
@@ -136,9 +142,11 @@ process.on("SIGINT", () => {
 
 app.listen(PORT, () => {
   console.log(`🚀 Compression API Server running on port ${PORT}`)
-//   console.log(`📁 Uploads directory: ${uploadsDir}`)
-//   console.log(`⚙️ Processed files directory: ${processedDir}`)
-//   console.log(`🔧 Available algorithms: huffman, rle, lz77`)
+  console.log(`📁 Uploads directory: ${uploadsDir}`)
+  console.log(`⚙️ Processed files directory: ${processedDir}`)
+  console.log(`🔧 Available algorithms: huffman, rle, lz77, jpeg`)
+  console.log(`📸 JPEG compression creates .jpg files`)
+  console.log(`🔄 All algorithms support decompression`)
 })
 
 module.exports = app

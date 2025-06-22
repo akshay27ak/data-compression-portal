@@ -1,5 +1,5 @@
 /**
- * Huffman Coding Implementation
+ * Huffman Coding Implementation - FIXED DECOMPRESSION
  * Research-based implementation using frequency analysis and binary tree construction
  */
 
@@ -133,7 +133,8 @@ function generateCodes(root) {
 function serializeTree(node) {
   if (!node) return ""
   if (node.isLeaf()) {
-    return "1" + String.fromCharCode(node.char)
+    // Use a safe encoding for the character
+    return "1" + node.char.toString().padStart(3, "0")
   }
   return "0" + serializeTree(node.left) + serializeTree(node.right)
 }
@@ -143,8 +144,10 @@ function deserializeTree(data, index = { value: 0 }) {
 
   if (data[index.value] === "1") {
     index.value++
-    const char = data.charCodeAt(index.value)
-    index.value++
+    // Read the 3-digit character code
+    const charStr = data.substr(index.value, 3)
+    const char = Number.parseInt(charStr, 10)
+    index.value += 3
     return new HuffmanNode(char, 0)
   } else {
     index.value++
@@ -191,7 +194,10 @@ async function compress(data) {
     }
 
     // Create compressed data format:
-    // [tree_length(4 bytes)][tree_data][padding(1 byte)][encoded_data]
+    // [original_length(4 bytes)][tree_length(4 bytes)][tree_data][padding(1 byte)][encoded_data]
+    const originalLengthBuffer = Buffer.alloc(4)
+    originalLengthBuffer.writeUInt32BE(data.length, 0)
+
     const treeBuffer = Buffer.from(serializedTree, "utf8")
     const treeLengthBuffer = Buffer.alloc(4)
     treeLengthBuffer.writeUInt32BE(treeBuffer.length, 0)
@@ -199,7 +205,7 @@ async function compress(data) {
     const paddingBuffer = Buffer.from([padding === 8 ? 0 : padding])
     const encodedBuffer = Buffer.from(encodedBytes)
 
-    return Buffer.concat([treeLengthBuffer, treeBuffer, paddingBuffer, encodedBuffer])
+    return Buffer.concat([originalLengthBuffer, treeLengthBuffer, treeBuffer, paddingBuffer, encodedBuffer])
   } catch (error) {
     throw new Error(`Huffman compression failed: ${error.message}`)
   }
@@ -212,6 +218,10 @@ async function decompress(compressedData) {
     }
 
     let offset = 0
+
+    // Read original length
+    const originalLength = compressedData.readUInt32BE(offset)
+    offset += 4
 
     // Read tree length
     const treeLength = compressedData.readUInt32BE(offset)
@@ -246,10 +256,12 @@ async function decompress(compressedData) {
     const decoded = []
     let current = root
 
-    for (let i = 0; i < bits.length; i++) {
+    for (let i = 0; i < bits.length && decoded.length < originalLength; i++) {
       if (current.isLeaf()) {
         decoded.push(current.char)
         current = root
+        i-- // Re-process this bit with the new current node
+        continue
       }
 
       if (bits[i] === "0") {
@@ -259,8 +271,8 @@ async function decompress(compressedData) {
       }
     }
 
-    // Handle last character
-    if (current && current.isLeaf()) {
+    // Handle last character if needed
+    if (current && current.isLeaf() && decoded.length < originalLength) {
       decoded.push(current.char)
     }
 

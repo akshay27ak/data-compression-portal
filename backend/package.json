@@ -9,25 +9,26 @@
     "test": "jest"
   },
   "dependencies": {
-    "compression": "^1.8.0",
+    "compression": "^1.7.4",
     "cors": "^2.8.5",
-    "dotenv": "^16.5.0",
-    "express": "^4.21.2",
-    "helmet": "^7.2.0",
-    "huffman-coding": "^1.0.0",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "helmet": "^7.1.0",
+    "jimp": "^0.22.12",
     "multer": "^1.4.5-lts.1",
-    "pako": "^2.1.0",
+    "sharp": "^0.33.5",
     "uuid": "^9.0.1"
   },
   "devDependencies": {
     "jest": "^29.7.0",
-    "nodemon": "^3.1.10"
+    "nodemon": "^3.0.2"
   },
   "keywords": [
     "compression",
     "huffman",
     "rle",
     "lz77",
+    "jpeg",
     "api"
   ],
   "author": "Your Name",

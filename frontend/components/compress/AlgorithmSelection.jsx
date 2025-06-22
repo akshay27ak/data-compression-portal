@@ -17,7 +17,7 @@ export default function AlgorithmSelection({
       case "text":
         return "huffman"
       case "image":
-        return "rle"
+        return "jpeg" // Changed from "rle" to "jpeg" for images
       case "binary":
         return "lz77"
       default:
@@ -79,7 +79,7 @@ export default function AlgorithmSelection({
         >
           {algorithms.map((algorithm) => (
             <option key={algorithm.id} value={algorithm.id}>
-              {algorithm.name} - {algorithm.efficiency} efficiency
+              {algorithm.name} - {algorithm.efficiency} efficiency ({algorithm.type})
             </option>
           ))}
         </select>
@@ -90,32 +90,53 @@ export default function AlgorithmSelection({
         <div className="bg-gray-50 rounded-lg p-4">
           <div className="flex items-start justify-between mb-2">
             <h4 className="font-semibold text-gray-900">{selectedAlgo.name}</h4>
-            <div className="relative">
-              <button
-                onMouseEnter={() => setShowTooltip(selectedAlgorithm)}
-                onMouseLeave={() => setShowTooltip(null)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
+            <div className="flex items-center gap-2">
+              <span
+                className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                  selectedAlgo.type === "lossless" ? "bg-green-100 text-green-800" : "bg-orange-100 text-orange-800"
+                }`}
               >
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path
-                    fillRule="evenodd"
-                    d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              </button>
+                {selectedAlgo.type.toUpperCase()}
+              </span>
+              <div className="relative">
+                <button
+                  onMouseEnter={() => setShowTooltip(selectedAlgorithm)}
+                  onMouseLeave={() => setShowTooltip(null)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path
+                      fillRule="evenodd"
+                      d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </button>
 
-              {showTooltip === selectedAlgorithm && (
-                <div className="absolute bottom-full right-0 mb-2 w-64 p-3 bg-gray-900 text-white text-xs rounded-lg shadow-lg z-10">
-                  <p className="mb-2 font-medium">{selectedAlgo.name}</p>
-                  <p>{selectedAlgo.description}</p>
-                  <div className="absolute top-full right-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
-                </div>
-              )}
+                {showTooltip === selectedAlgorithm && (
+                  <div className="absolute bottom-full right-0 mb-2 w-64 p-3 bg-gray-900 text-white text-xs rounded-lg shadow-lg z-10">
+                    <p className="mb-2 font-medium">{selectedAlgo.name}</p>
+                    <p>{selectedAlgo.description}</p>
+                    <div className="absolute top-full right-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
           <p className="text-sm text-gray-600 mb-3">{selectedAlgo.description}</p>
+
+          {/* Lossy Warning for JPEG */}
+          {selectedAlgo.type === "lossy" && (
+            <div className="mb-3 p-2 bg-orange-50 border border-orange-200 rounded-lg">
+              <div className="flex items-center gap-2">
+                <span className="text-orange-600">⚠️</span>
+                <span className="text-xs font-medium text-orange-800">
+                  Lossy Compression: Some image quality will be lost but file size will be significantly reduced
+                </span>
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-3 gap-3 text-xs">
             <div className="text-center p-2 bg-white rounded">

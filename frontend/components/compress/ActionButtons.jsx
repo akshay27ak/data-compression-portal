@@ -1,6 +1,13 @@
 "use client"
 
-export default function ActionButtons({ onCompress, onDecompress, isProcessing, processingAction, disabled }) {
+export default function ActionButtons({
+  onCompress,
+  onDecompress,
+  isProcessing,
+  processingAction,
+  disabled,
+  selectedAlgorithm,
+}) {
   const getButtonText = (action) => {
     if (isProcessing && processingAction === action) {
       switch (processingAction) {
@@ -16,6 +23,8 @@ export default function ActionButtons({ onCompress, onDecompress, isProcessing, 
     }
     return action === "compress" ? "Compress File" : "Decompress File"
   }
+
+  const isDecompressDisabled = disabled || isProcessing || selectedAlgorithm === "jpeg"
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
@@ -55,11 +64,11 @@ export default function ActionButtons({ onCompress, onDecompress, isProcessing, 
 
         <button
           onClick={onDecompress}
-          disabled={disabled || isProcessing}
+          disabled={isDecompressDisabled}
           className={`
             flex items-center justify-center gap-2 py-4 px-6 rounded-lg font-semibold transition-all duration-200
             ${
-              disabled || isProcessing
+              isDecompressDisabled
                 ? "bg-gray-200 text-gray-400 cursor-not-allowed"
                 : "bg-green-600 hover:bg-green-700 text-white hover:scale-105 focus:outline-none focus:ring-4 focus:ring-green-300 active:scale-95"
             }
@@ -85,6 +94,15 @@ export default function ActionButtons({ onCompress, onDecompress, isProcessing, 
             ? "Uploading file to server..."
             : "Please upload a file to enable compression/decompression"}
         </p>
+      )}
+
+      {selectedAlgorithm === "jpeg" && !disabled && (
+        <div className="mt-3 p-2 bg-orange-50 border border-orange-200 rounded-lg">
+          <p className="text-center text-sm text-orange-800">
+            <span className="font-medium">Note:</span> JPEG is lossy compression. Decompression converts to raw image
+            data.
+          </p>
+        </div>
       )}
     </div>
   )

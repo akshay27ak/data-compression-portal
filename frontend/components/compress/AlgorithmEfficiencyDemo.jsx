@@ -19,6 +19,11 @@ export default function AlgorithmEfficiencyDemo({ fileType, originalSize }) {
         image: { ratio: 40, speed: 2.8, explanation: "Good compression by finding repeated pixel patterns" },
         binary: { ratio: 50, speed: 3.0, explanation: "Excellent general-purpose compression for binary files" },
       },
+      jpeg: {
+        text: { ratio: 10, speed: 1.5, explanation: "Not suitable for text - designed for photographic images" },
+        image: { ratio: 85, speed: 1.2, explanation: "Excellent for photos - optimized for human visual perception" },
+        binary: { ratio: 5, speed: 1.8, explanation: "Not recommended for binary data - may cause corruption" },
+      },
     }
 
     return (
@@ -26,7 +31,7 @@ export default function AlgorithmEfficiencyDemo({ fileType, originalSize }) {
     )
   }
 
-  const algorithms = ["huffman", "rle", "lz77"]
+  const algorithms = ["huffman", "rle", "lz77", "jpeg"]
   const fileTypeDisplay = fileType || "binary"
 
   return (
@@ -45,15 +50,31 @@ export default function AlgorithmEfficiencyDemo({ fileType, originalSize }) {
         {algorithms.map((algorithm) => {
           const efficiency = getAlgorithmEfficiency(algorithm, fileTypeDisplay, originalSize)
           const compressedSize = originalSize * (1 - efficiency.ratio / 100)
+          const isRecommended =
+            (fileTypeDisplay === "text" && algorithm === "huffman") ||
+            (fileTypeDisplay === "image" && algorithm === "jpeg") ||
+            (fileTypeDisplay === "binary" && algorithm === "lz77")
 
           return (
-            <div key={algorithm} className="border border-gray-200 rounded-lg p-4">
+            <div
+              key={algorithm}
+              className={`border rounded-lg p-4 ${isRecommended ? "border-blue-300 bg-blue-50" : "border-gray-200"}`}
+            >
               <div className="flex items-center justify-between mb-3">
-                <h4 className="font-semibold text-gray-900 capitalize">{algorithm} Coding</h4>
+                <div className="flex items-center gap-2">
+                  <h4 className="font-semibold text-gray-900 capitalize">
+                    {algorithm === "jpeg" ? "JPEG" : algorithm} {algorithm === "jpeg" ? "Compression" : "Coding"}
+                  </h4>
+                  {isRecommended && (
+                    <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full font-medium">
+                      Recommended
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center gap-2">
                   <span
                     className={`px-2 py-1 text-xs rounded-full ${
-                      efficiency.ratio >= 50
+                      efficiency.ratio >= 70
                         ? "bg-green-100 text-green-800"
                         : efficiency.ratio >= 30
                           ? "bg-yellow-100 text-yellow-800"
@@ -62,6 +83,9 @@ export default function AlgorithmEfficiencyDemo({ fileType, originalSize }) {
                   >
                     {efficiency.ratio}% compression
                   </span>
+                  {algorithm === "jpeg" && (
+                    <span className="px-2 py-1 text-xs bg-orange-100 text-orange-800 rounded-full">Lossy</span>
+                  )}
                 </div>
               </div>
 
@@ -89,9 +113,9 @@ export default function AlgorithmEfficiencyDemo({ fileType, originalSize }) {
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div
                     className={`h-2 rounded-full transition-all duration-1000 ${
-                      efficiency.ratio >= 50 ? "bg-green-500" : efficiency.ratio >= 30 ? "bg-yellow-500" : "bg-red-500"
+                      efficiency.ratio >= 70 ? "bg-green-500" : efficiency.ratio >= 30 ? "bg-yellow-500" : "bg-red-500"
                     }`}
-                    style={{ width: `${efficiency.ratio}%` }}
+                    style={{ width: `${Math.min(efficiency.ratio, 100)}%` }}
                   ></div>
                 </div>
               </div>
@@ -115,6 +139,11 @@ export default function AlgorithmEfficiencyDemo({ fileType, originalSize }) {
             )}
           </strong>{" "}
           typically provides the best compression ratio.
+          {fileTypeDisplay === "image" && (
+            <span className="block mt-1 text-xs">
+              Note: JPEG is lossy compression - some image quality will be lost for smaller file sizes.
+            </span>
+          )}
         </p>
       </div>
     </div>

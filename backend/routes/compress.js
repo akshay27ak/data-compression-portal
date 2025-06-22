@@ -7,6 +7,7 @@ const { v4: uuidv4 } = require("uuid")
 const huffmanAlgorithm = require("../algorithms/huffman")
 const rleAlgorithm = require("../algorithms/rle")
 const lz77Algorithm = require("../algorithms/lz77")
+const jpegAlgorithm = require("../algorithms/jpeg")
 
 const router = express.Router()
 
@@ -15,6 +16,7 @@ const algorithms = {
   huffman: huffmanAlgorithm,
   rle: rleAlgorithm,
   lz77: lz77Algorithm,
+  jpeg: jpegAlgorithm,
 }
 
 // Compression endpoint
@@ -65,10 +67,19 @@ router.post("/", async (req, res) => {
     const endTime = Date.now()
     const processingTime = ((endTime - startTime) / 1000).toFixed(2)
 
-    // Save compressed file
+    // Save compressed file with appropriate extension
     const compressedFileId = uuidv4()
-    const compressedFileName = `${compressedFileId}_compressed_${algorithm}.bin`
-    const compressedFilePath = path.join("processed", compressedFileName)
+    let compressedFileName, compressedFilePath
+
+    if (algorithm === "jpeg") {
+      // For JPEG, save as .jpg file
+      compressedFileName = `${compressedFileId}_compressed.jpg`
+      compressedFilePath = path.join("processed", compressedFileName)
+    } else {
+      // For other algorithms, save as .bin file
+      compressedFileName = `${compressedFileId}_compressed_${algorithm}.bin`
+      compressedFilePath = path.join("processed", compressedFileName)
+    }
 
     fs.writeFileSync(compressedFilePath, compressedData)
 
@@ -171,8 +182,17 @@ router.post("/decompress", async (req, res) => {
 
     // Save decompressed file
     const decompressedFileId = uuidv4()
-    const decompressedFileName = `${decompressedFileId}_decompressed_${algorithm}.bin`
-    const decompressedFilePath = path.join("processed", decompressedFileName)
+    let decompressedFileName, decompressedFilePath
+
+    if (algorithm === "jpeg") {
+      // For JPEG decompression, save as .png (raw image data)
+      decompressedFileName = `${decompressedFileId}_decompressed.png`
+      decompressedFilePath = path.join("processed", decompressedFileName)
+    } else {
+      // For other algorithms, save as .bin file
+      decompressedFileName = `${decompressedFileId}_decompressed_${algorithm}.bin`
+      decompressedFilePath = path.join("processed", decompressedFileName)
+    }
 
     fs.writeFileSync(decompressedFilePath, decompressedData)
 
@@ -196,13 +216,18 @@ router.post("/decompress", async (req, res) => {
 
     console.log(`✅ Decompression completed: ${compressedSize} → ${decompressedSize} bytes`)
 
+    const explanation =
+      algorithm === "jpeg"
+        ? `JPEG decompression converted your compressed image back to raw image data (PNG format). Note: Some quality loss occurred during the original JPEG compression as it's a lossy format.`
+        : `Successfully decompressed your file using ${algorithm} algorithm. The original data has been perfectly restored with no quality loss.`
+
     res.json({
       fileId: decompressedFileId,
       originalSize: compressedSize,
       decompressedSize: decompressedSize,
       processingTime: processingTime,
       algorithm: algorithm,
-      explanation: `Successfully decompressed your file using ${algorithm} algorithm. The original data has been perfectly restored with no quality loss.`,
+      explanation: explanation,
       message: "File decompressed successfully",
     })
   } catch (error) {
@@ -232,6 +257,11 @@ function generateCompressionExplanation(algorithm, ratio, mimeType) {
       text: `LZ77 achieved ${ratio}% compression by finding and referencing repeated phrases and words in your text. This dictionary-based approach is excellent for text with recurring patterns.`,
       image: `LZ77 achieved ${ratio}% compression by identifying repeated pixel patterns and replacing them with references to earlier occurrences. This works well for images with recurring visual elements.`,
       binary: `LZ77 achieved ${ratio}% compression using its sliding window approach to find repeated byte sequences in your binary file. This general-purpose algorithm adapts well to various data patterns.`,
+    },
+    jpeg: {
+      text: `JPEG compression achieved ${ratio}% size reduction, but this algorithm is not recommended for text files as it's designed for photographic images and may introduce artifacts.`,
+      image: `JPEG compression achieved ${ratio}% size reduction by removing visual information that's less perceptible to human eyes. This lossy compression is specifically optimized for photographic images and creates industry-standard .jpg files.`,
+      binary: `JPEG compression achieved ${ratio}% size reduction, but this algorithm is not suitable for binary data and may cause data corruption. Use lossless algorithms for binary files.`,
     },
   }
 

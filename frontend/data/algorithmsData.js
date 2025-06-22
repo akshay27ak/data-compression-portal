@@ -156,6 +156,59 @@ This approach is particularly effective for data with repeated patterns and form
       "General-purpose file archiving",
     ],
   },
+  {
+    id: "jpeg",
+    name: "JPEG Compression",
+    type: "lossy",
+    description:
+      "Industry-standard lossy compression specifically designed for photographic images with excellent quality-to-size ratio.",
+    efficiency: "Very High",
+    bestFor: "Photographic images, complex images with gradients",
+    compressionRatio: "80-95%",
+    speed: "Fast",
+    memoryUsage: "Medium",
+    detailedDescription: `JPEG (Joint Photographic Experts Group) compression is a lossy compression method specifically designed for photographic images. It achieves high compression ratios by removing information that is less perceptible to human vision.
+
+The JPEG algorithm works through several stages:
+1. **Color Space Conversion**: Convert RGB to YCbCr (luminance + chrominance)
+2. **Chroma Subsampling**: Reduce color information (humans are less sensitive to color than brightness)
+3. **Block Division**: Divide image into 8x8 pixel blocks
+4. **DCT Transform**: Apply Discrete Cosine Transform to convert spatial data to frequency domain
+5. **Quantization**: Remove high-frequency components (this is where data loss occurs)
+6. **Entropy Encoding**: Use Huffman coding to compress the quantized data
+
+The quality parameter controls the quantization step - higher quality means less compression but better image fidelity.`,
+    technicalDetails: {
+      algorithm: "DCT-based lossy compression",
+      colorSpace: "YCbCr with chroma subsampling",
+      blockSize: "8x8 pixel blocks",
+      quantization: "Configurable quality levels (1-100)",
+      entropy: "Huffman coding for final compression",
+    },
+    pros: [
+      "Excellent compression ratios for photos",
+      "Industry standard with universal support",
+      "Adjustable quality vs size trade-off",
+      "Optimized for human visual perception",
+      "Fast compression and decompression",
+      "Mature and well-optimized implementations",
+    ],
+    cons: [
+      "Lossy compression (some data is permanently lost)",
+      "Not suitable for text or line art",
+      "Compression artifacts at low quality settings",
+      "Not ideal for images with sharp edges",
+      "Multiple save cycles degrade quality",
+    ],
+    useCases: [
+      "Digital photography",
+      "Web images and thumbnails",
+      "Social media image sharing",
+      "Digital cameras and smartphones",
+      "Image galleries and portfolios",
+      "Medical imaging (with quality considerations)",
+    ],
+  },
 ]
 
 export const getAlgorithmById = (id) => {
@@ -168,6 +221,10 @@ export const getAlgorithmsByType = (type) => {
 
 export const getLosslessAlgorithms = () => {
   return getAlgorithmsByType("lossless")
+}
+
+export const getLossyAlgorithms = () => {
+  return getAlgorithmsByType("lossy")
 }
 
 export const getAlgorithmNames = () => {

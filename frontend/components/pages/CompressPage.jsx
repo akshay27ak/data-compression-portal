@@ -68,7 +68,7 @@ export default function CompressPage() {
       case "text":
         return "huffman"
       case "image":
-        return "rle"
+        return "jpeg" // Changed from "rle" to "jpeg" for images
       case "binary":
         return "lz77"
       default:
@@ -95,7 +95,7 @@ export default function CompressPage() {
         originalSize: result.originalSize || selectedFile.size,
         processedSize: result.compressedSize || result.processedSize,
         algorithm: selectedAlgorithm,
-        algorithmType: "Lossless",
+        algorithmType: selectedAlgorithm === "jpeg" ? "Lossy" : "Lossless",
         timeTaken: result.processingTime || result.timeTaken,
         performanceExplanation:
           result.explanation || getPerformanceExplanation(selectedAlgorithm, detectedFileType, result),
@@ -116,6 +116,12 @@ export default function CompressPage() {
   const handleDecompress = async () => {
     if (!selectedFile || !uploadedFileId) {
       setError("Please upload a file first")
+      return
+    }
+
+    // Check if trying to decompress with JPEG
+    if (selectedAlgorithm === "jpeg") {
+      setError("JPEG decompression converts to raw image data. Use compress to create JPEG files.")
       return
     }
 
@@ -169,6 +175,11 @@ export default function CompressPage() {
         image: `LZ77 achieved ${ratio.toFixed(1)}% compression by identifying repeated pixel patterns and replacing them with references to earlier occurrences. This works well for images with recurring visual elements.`,
         binary: `LZ77 achieved ${ratio.toFixed(1)}% compression using its sliding window approach to find repeated byte sequences in your binary file. This general-purpose algorithm adapts well to various data patterns.`,
       },
+      jpeg: {
+        text: `JPEG compression achieved ${ratio.toFixed(1)}% size reduction, but this algorithm is not recommended for text files as it's designed for photographic images and may introduce artifacts.`,
+        image: `JPEG compression achieved ${ratio.toFixed(1)}% size reduction by removing visual information that's less perceptible to human eyes. This lossy compression is specifically optimized for photographic images.`,
+        binary: `JPEG compression achieved ${ratio.toFixed(1)}% size reduction, but this algorithm is not suitable for binary data and may cause data corruption. Use lossless algorithms for binary files.`,
+      },
     }
 
     return explanations[algorithm]?.[fileType] || `${algorithm} achieved ${ratio.toFixed(1)}% compression on your file.`
@@ -202,6 +213,7 @@ export default function CompressPage() {
             isProcessing={isProcessing}
             processingAction={processingAction}
             disabled={!selectedFile || !uploadedFileId}
+            selectedAlgorithm={selectedAlgorithm}
           />
         </div>
       </div>
