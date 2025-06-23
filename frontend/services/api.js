@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000" || "https://data-compression-portal-tawny.vercel.app"
 
 // Upload file
 export const uploadFile = async (file) => {
