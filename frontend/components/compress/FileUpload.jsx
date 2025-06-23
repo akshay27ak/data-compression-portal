@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react"
 
-export default function FileUpload({ onFileSelect, selectedFile }) {
+export default function FileUpload({ onFileSelect, selectedFile, fileStatus }) {
   const [dragActive, setDragActive] = useState(false)
   const fileInputRef = useRef(null)
 
@@ -97,7 +97,9 @@ export default function FileUpload({ onFileSelect, selectedFile }) {
             dragActive
               ? "border-blue-400 bg-blue-50 scale-105"
               : selectedFile
-                ? "border-green-400 bg-green-50"
+                ? fileStatus?.isCompressed
+                  ? "border-purple-400 bg-purple-50"
+                  : "border-green-400 bg-green-50"
                 : "border-gray-300 hover:border-gray-400 hover:bg-gray-50"
           }
         `}
@@ -114,15 +116,56 @@ export default function FileUpload({ onFileSelect, selectedFile }) {
             <div className="flex items-center justify-center gap-4">
               {getFilePreview(selectedFile)}
               <div className="text-left flex-1">
-                <p className="font-semibold text-gray-900 text-lg truncate">{selectedFile.name}</p>
+                <div className="flex items-center gap-2 mb-1">
+                  <p className="font-semibold text-gray-900 text-lg truncate">{selectedFile.name}</p>
+                  {fileStatus?.isCompressed && (
+                    <span className="px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded-full font-medium">
+                      🗜️ COMPRESSED
+                    </span>
+                  )}
+                </div>
                 <p className="text-sm text-gray-500">
                   {formatFileSize(selectedFile.size)} • {selectedFile.type || "Unknown type"}
                 </p>
+                {fileStatus?.isCompressed && (
+                  <p className="text-xs text-purple-600 font-medium mt-1">
+                    Algorithm: {fileStatus.detectedAlgorithm?.toUpperCase()}
+                  </p>
+                )}
                 <p className="text-xs text-gray-400 mt-1">
                   Last modified: {new Date(selectedFile.lastModified).toLocaleDateString()}
                 </p>
               </div>
             </div>
+
+            {/* File Status Banner */}
+            {fileStatus?.isCompressed ? (
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-purple-600">🗜️</span>
+                  <div>
+                    <p className="text-sm font-medium text-purple-800">Compressed File Detected</p>
+                    <p className="text-xs text-purple-600">
+                      This file was compressed using {fileStatus.detectedAlgorithm?.toUpperCase()} algorithm. Use
+                      decompress to restore the original file.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-green-600">📄</span>
+                  <div>
+                    <p className="text-sm font-medium text-green-800">Original File</p>
+                    <p className="text-xs text-green-600">
+                      This is an uncompressed file. You can compress it using any available algorithm.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-2">
               <button
                 onClick={(e) => {

@@ -22,6 +22,7 @@ export default function CompressPage() {
   const [compressionResult, setCompressionResult] = useState(null)
   const [error, setError] = useState("")
   const [downloadReady, setDownloadReady] = useState(false)
+  const [fileStatus, setFileStatus] = useState({ isCompressed: false, detectedAlgorithm: null })
 
   const handleFileSelect = async (file) => {
     // Reset all states when new file is selected
@@ -31,31 +32,53 @@ export default function CompressPage() {
     setError("")
     setUploadedFileId(null)
     setDetectedFileType(null)
+    setFileStatus({ isCompressed: false, detectedAlgorithm: null })
 
     if (!file) {
-      // Reset algorithm to default when file is removed
       setSelectedAlgorithm("huffman")
       return
     }
 
-    // Detect file type
-    const fileType = detectFileType(file)
-    setDetectedFileType(fileType)
-
-    // Auto-suggest algorithm if enabled (always refresh)
-    const suggestedAlgorithm = suggestAlgorithm(fileType)
-    if (autoSuggest) {
-      setSelectedAlgorithm(suggestedAlgorithm)
-    }
-
-    // Upload file to backend
+    // Upload file to backend for processing and detection
     try {
       setIsProcessing(true)
       setProcessingAction("upload")
 
+      console.log("🔄 Uploading file:", file.name)
       const uploadResult = await uploadFile(file)
+      console.log("✅ Upload result:", uploadResult)
+
       setUploadedFileId(uploadResult.fileId || uploadResult.id)
+
+      // Set file status from backend response
+      const status = {
+        isCompressed: uploadResult.isCompressed || false,
+        detectedAlgorithm: uploadResult.detectedAlgorithm,
+        compressionType: uploadResult.compressionType,
+      }
+      setFileStatus(status)
+
+      console.log("📊 File status:", status)
+
+      // Handle algorithm selection based on file status
+      if (status.isCompressed) {
+        // For compressed files, set the detected algorithm
+        setSelectedAlgorithm(status.detectedAlgorithm)
+        setDetectedFileType("compressed")
+        console.log(`🗜️ Compressed file detected: ${status.detectedAlgorithm}`)
+      } else {
+        // For original files, detect type and suggest algorithm
+        const fileType = detectFileType(file)
+        setDetectedFileType(fileType)
+
+        if (autoSuggest) {
+          const suggestedAlgorithm = suggestAlgorithm(fileType)
+          setSelectedAlgorithm(suggestedAlgorithm)
+        }
+        console.log(`📄 Original file detected: ${fileType}`)
+      }
     } catch (err) {
+      console.error("❌ Upload error:", err)
       setError(`Upload failed: ${err.message}`)
     } finally {
       setIsProcessing(false)
@@ -82,12 +105,11 @@ export default function CompressPage() {
     }
   }
 
-  // Handle auto-suggest toggle change
   const handleAutoSuggestChange = (enabled) => {
     setAutoSuggest(enabled)
 
-    // If enabling auto-suggest and we have a detected file type, update algorithm
-    if (enabled && detectedFileType) {
+    // Only auto-suggest for non-compressed files
+    if (enabled && detectedFileType && !fileStatus.isCompressed) {
       const suggestedAlgorithm = suggestAlgorithm(detectedFileType)
       setSelectedAlgorithm(suggestedAlgorithm)
     }
@@ -99,14 +121,20 @@ export default function CompressPage() {
       return
     }
 
+    if (fileStatus.isCompressed) {
+      setError("This file is already compressed. Use decompress instead.")
+      return
+    }
+
     setIsProcessing(true)
     setProcessingAction("compress")
     setError("")
 
     try {
+      console.log(`🗜️ Starting compression: ${selectedAlgorithm} on file ${uploadedFileId}`)
       const result = await compressFile(uploadedFileId, selectedAlgorithm)
+      console.log("✅ Compression result:", result)
 
-      // Format result for display
       const formattedResult = {
         action: "compress",
         originalSize: result.originalSize || selectedFile.size,
@@ -123,6 +151,7 @@ export default function CompressPage() {
       setCompressionResult(formattedResult)
       setDownloadReady(true)
     } catch (err) {
+      console.error("❌ Compression error:", err)
       setError(`Compression failed: ${err.message}`)
     } finally {
       setIsProcessing(false)
@@ -136,14 +165,22 @@ export default function CompressPage() {
       return
     }
 
+    if (!fileStatus.isCompressed) {
+      setError("This file is not compressed. Use compress instead.")
+      return
+    }
+
     setIsProcessing(true)
     setProcessingAction("decompress")
     setError("")
 
     try {
-      const result = await decompressFile(uploadedFileId, selectedAlgorithm)
+      console.log(`📦 Starting decompression: ${selectedAlgorithm} on file ${uploadedFileId}`)
+      console.log("🔍 File status:", fileStatus)
 
-      // Format result for display - Fixed parsing
+      const result = await decompressFile(uploadedFileId, selectedAlgorithm)
+      console.log("✅ Decompression result:", result)
+
       const formattedResult = {
         action: "decompress",
         originalSize: result.originalSize || selectedFile.size,
@@ -152,18 +189,14 @@ export default function CompressPage() {
         algorithmType: selectedAlgorithm === "jpeg" ? "Lossy to Lossless" : "Lossless",
         timeTaken: result.processingTime || result.timeTaken,
         performanceExplanation:
-          result.explanation ||
-          `Successfully decompressed your file using ${selectedAlgorithm} algorithm. ${
-            selectedAlgorithm === "jpeg"
-              ? "Converted to PNG format for lossless storage."
-              : "The original data has been perfectly restored."
-          }`,
+          result.explanation || `Successfully decompressed your file using ${selectedAlgorithm} algorithm.`,
         fileId: result.fileId || result.id,
       }
 
       setCompressionResult(formattedResult)
       setDownloadReady(true)
     } catch (err) {
+      console.error("❌ Decompression error:", err)
       setError(`Decompression failed: ${err.message}`)
     } finally {
       setIsProcessing(false)
@@ -173,31 +206,7 @@ export default function CompressPage() {
 
   const getPerformanceExplanation = (algorithm, fileType, result) => {
     const ratio = result.compressionRatio || ((result.originalSize - result.processedSize) / result.originalSize) * 100
-
-    const explanations = {
-      huffman: {
-        text: `Huffman coding achieved ${ratio.toFixed(1)}% compression by analyzing character frequencies in your text file. Common characters were assigned shorter codes, making this algorithm highly effective for text data.`,
-        image: `Huffman coding achieved ${ratio.toFixed(1)}% compression on your image. While not optimal for images due to uniform pixel distribution, it still provided some compression by encoding frequent color values with shorter codes.`,
-        binary: `Huffman coding achieved ${ratio.toFixed(1)}% compression on your binary file by creating variable-length codes based on byte frequency patterns found in the data structure.`,
-      },
-      rle: {
-        text: `Run-Length Encoding achieved ${ratio.toFixed(1)}% compression on your text file. This algorithm works best with repeated characters, so the compression ratio depends on how many consecutive identical characters your text contains.`,
-        image: `Run-Length Encoding achieved ${ratio.toFixed(1)}% compression by efficiently encoding consecutive pixels of the same color. This algorithm excels with images containing large uniform areas.`,
-        binary: `Run-Length Encoding achieved ${ratio.toFixed(1)}% compression by replacing sequences of identical bytes with count-value pairs. The effectiveness depends on repetitive patterns in your binary data.`,
-      },
-      lz77: {
-        text: `LZ77 achieved ${ratio.toFixed(1)}% compression by finding and referencing repeated phrases and words in your text. This dictionary-based approach is excellent for text with recurring patterns.`,
-        image: `LZ77 achieved ${ratio.toFixed(1)}% compression by identifying repeated pixel patterns and replacing them with references to earlier occurrences. This works well for images with recurring visual elements.`,
-        binary: `LZ77 achieved ${ratio.toFixed(1)}% compression using its sliding window approach to find repeated byte sequences in your binary file. This general-purpose algorithm adapts well to various data patterns.`,
-      },
-      jpeg: {
-        text: `JPEG compression achieved ${ratio.toFixed(1)}% size reduction, but this algorithm is not recommended for text files as it's designed for photographic images and may introduce artifacts.`,
-        image: `JPEG compression achieved ${ratio.toFixed(1)}% size reduction by removing visual information that's less perceptible to human eyes. This lossy compression creates industry-standard .jpeg files that can be opened in any image viewer.`,
-        binary: `JPEG compression achieved ${ratio.toFixed(1)}% size reduction, but this algorithm is not suitable for binary data and may cause data corruption. Use lossless algorithms for binary files.`,
-      },
-    }
-
-    return explanations[algorithm]?.[fileType] || `${algorithm} achieved ${ratio.toFixed(1)}% compression on your file.`
+    return `${algorithm} achieved ${ratio.toFixed(1)}% compression on your ${fileType} file.`
   }
 
   return (
@@ -207,9 +216,11 @@ export default function CompressPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Left Column */}
         <div className="space-y-6">
-          <FileUpload onFileSelect={handleFileSelect} selectedFile={selectedFile} />
+          <FileUpload onFileSelect={handleFileSelect} selectedFile={selectedFile} fileStatus={fileStatus} />
 
-          {selectedFile && <FileTypeDetection file={selectedFile} detectedType={detectedFileType} />}
+          {selectedFile && (
+            <FileTypeDetection file={selectedFile} detectedType={detectedFileType} compressionStatus={fileStatus} />
+          )}
         </div>
 
         {/* Right Column */}
@@ -217,7 +228,7 @@ export default function CompressPage() {
           <AlgorithmSelection
             selectedAlgorithm={selectedAlgorithm}
             onAlgorithmChange={setSelectedAlgorithm}
-            autoSuggest={autoSuggest}
+            autoSuggest={autoSuggest && !fileStatus.isCompressed}
             onAutoSuggestChange={handleAutoSuggestChange}
             detectedFileType={detectedFileType}
           />
@@ -229,12 +240,13 @@ export default function CompressPage() {
             processingAction={processingAction}
             disabled={!selectedFile || !uploadedFileId}
             selectedAlgorithm={selectedAlgorithm}
+            fileStatus={fileStatus}
           />
         </div>
       </div>
 
-      {/* Algorithm Efficiency Demo - Shows after file upload */}
-      {selectedFile && !compressionResult && (
+      {/* Algorithm Efficiency Demo - Only show for original files */}
+      {selectedFile && !compressionResult && !fileStatus.isCompressed && (
         <AlgorithmEfficiencyDemo fileType={detectedFileType} originalSize={selectedFile.size} />
       )}
 

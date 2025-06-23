@@ -7,25 +7,43 @@ export default function DownloadSection({ result, fileName, fileId }) {
   const [isDownloading, setIsDownloading] = useState(false)
 
   const getDownloadFileName = () => {
-    // Use the filename from the result if available
+    // PRIORITY 1: Use the filename from the backend result (this is the correct one!)
     if (result.fileName) {
+      console.log(`🔍 Using backend filename: ${result.fileName}`)
       return result.fileName
     }
 
-    // Fallback to generating filename
+    // PRIORITY 2: Generate filename based on action and algorithm (fallback)
     if (!fileName) return "processed_file"
 
     const nameWithoutExt = fileName.split(".").slice(0, -1).join(".")
-    const extension =
-      result.action === "compress"
-        ? result.algorithm === "jpeg"
-          ? "jpeg"
-          : "bin"
-        : result.algorithm === "jpeg"
-          ? "png"
-          : fileName.split(".").pop()
+    let extension
 
-    return `${nameWithoutExt}_${result.action}ed_${result.algorithm}.${extension}`
+    if (result.action === "compress") {
+      extension = result.algorithm === "jpeg" ? "jpeg" : "bin"
+    } else {
+      // For decompression, restore original extension
+      if (result.algorithm === "jpeg") {
+        extension = "png"
+      } else {
+        // Extract original extension from compressed filename
+        if (fileName.includes("_compressed_")) {
+          const beforeCompressed = fileName.split("_compressed_")[0]
+          const lastDotIndex = beforeCompressed.lastIndexOf(".")
+          if (lastDotIndex !== -1) {
+            extension = beforeCompressed.substring(lastDotIndex + 1)
+          } else {
+            extension = "txt" // default
+          }
+        } else {
+          extension = "txt" // default for decompression
+        }
+      }
+    }
+
+    const generatedName = `${nameWithoutExt}_${result.action}ed_${result.algorithm}.${extension}`
+    console.log(`🔍 Generated filename: ${generatedName}`)
+    return generatedName
   }
 
   const getFileIcon = () => {
@@ -48,6 +66,36 @@ export default function DownloadSection({ result, fileName, fileId }) {
     }
   }
 
+  const getFileTypeDescription = () => {
+    const filename = getDownloadFileName()
+    const ext = filename.split(".").pop()?.toLowerCase()
+
+    if (result.action === "compress") {
+      if (result.algorithm === "jpeg") {
+        return "Standard JPEG format"
+      } else {
+        return "Compressed binary format"
+      }
+    } else {
+      // Decompression
+      if (result.algorithm === "jpeg") {
+        return "PNG format (lossless)"
+      } else {
+        switch (ext) {
+          case "txt":
+            return "Text file (restored)"
+          case "png":
+            return "PNG image (restored)"
+          case "jpg":
+          case "jpeg":
+            return "JPEG image (restored)"
+          default:
+            return "Original format (restored)"
+        }
+      }
+    }
+  }
+
   const handleDownload = async () => {
     if (!fileId) {
       alert("No file available for download")
@@ -57,7 +105,9 @@ export default function DownloadSection({ result, fileName, fileId }) {
     setIsDownloading(true)
 
     try {
-      await downloadFile(fileId, getDownloadFileName())
+      const downloadFileName = getDownloadFileName()
+      console.log(`📥 Downloading file: ${downloadFileName}`)
+      await downloadFile(fileId, downloadFileName)
     } catch (error) {
       alert(`Download failed: ${error.message}`)
     } finally {
@@ -83,9 +133,7 @@ export default function DownloadSection({ result, fileName, fileId }) {
             <div>
               <p className="font-semibold text-gray-900">{getDownloadFileName()}</p>
               <p className="text-sm text-gray-500">
-                {result.action === "compress" ? "Compressed" : "Decompressed"} file
-                {result.algorithm === "jpeg" && result.action === "compress" && " (Standard JPEG format)"}
-                {result.algorithm === "jpeg" && result.action === "decompress" && " (PNG format)"}
+                {result.action === "compress" ? "Compressed" : "Decompressed"} file ({getFileTypeDescription()})
               </p>
             </div>
           </div>
@@ -103,38 +151,38 @@ export default function DownloadSection({ result, fileName, fileId }) {
         </div>
 
         {/* File Type Info */}
-        {result.algorithm === "jpeg" && (
+        {result.action === "compress" && result.algorithm === "jpeg" && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
             <p className="text-sm text-blue-800">
-              {result.action === "compress" ? (
-                <>
-                  <span className="font-medium">📸 JPEG File:</span> This .jpeg file can be opened in any image viewer
-                  or editor.
-                </>
-              ) : (
-                <>
-                  <span className="font-medium">🖼️ PNG File:</span> Decompressed to lossless PNG format for quality
-                  preservation.
-                </>
-              )}
+              <span className="font-medium">📸 JPEG File:</span> This .jpeg file can be opened in any image viewer or
+              editor.
             </p>
           </div>
         )}
 
-        {result.algorithm !== "jpeg" && (
+        {result.action === "decompress" && result.algorithm === "jpeg" && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <p className="text-sm text-blue-800">
+              <span className="font-medium">🖼️ PNG File:</span> Decompressed to lossless PNG format for quality
+              preservation.
+            </p>
+          </div>
+        )}
+
+        {result.action === "compress" && result.algorithm !== "jpeg" && (
           <div className="bg-green-50 border border-green-200 rounded-lg p-3">
             <p className="text-sm text-green-800">
-              {result.action === "compress" ? (
-                <>
-                  <span className="font-medium">🗜️ Compressed File:</span> Upload this .bin file back to decompress and
-                  restore your original file.
-                </>
-              ) : (
-                <>
-                  <span className="font-medium">📄 Restored File:</span> Your original file has been restored with the
-                  correct extension.
-                </>
-              )}
+              <span className="font-medium">🗜️ Compressed File:</span> Upload this .bin file back to decompress and
+              restore your original file.
+            </p>
+          </div>
+        )}
+
+        {result.action === "decompress" && result.algorithm !== "jpeg" && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+            <p className="text-sm text-green-800">
+              <span className="font-medium">📄 Restored File:</span> Your original file has been restored with the
+              correct extension and can be opened normally.
             </p>
           </div>
         )}

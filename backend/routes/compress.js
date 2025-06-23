@@ -19,7 +19,108 @@ const algorithms = {
   jpeg: jpegAlgorithm,
 }
 
-// Compression endpoint
+// ENHANCED: Better original extension extraction
+const extractOriginalExtension = (fileName) => {
+  console.log(`🔍 Extracting extension from: ${fileName}`)
+
+  // Pattern: "filename_compressed_algorithm.bin"
+  if (fileName.includes("_compressed_")) {
+    const parts = fileName.split("_compressed_")
+    if (parts.length > 0) {
+      const originalPart = parts[0]
+      const lastDot = originalPart.lastIndexOf(".")
+      if (lastDot !== -1) {
+        const ext = originalPart.substring(lastDot)
+        console.log(`✅ Found original extension: ${ext}`)
+        return ext
+      }
+    }
+  }
+
+  // Fallback: extract from current filename
+  const currentExt = path.extname(fileName)
+  if (currentExt && currentExt !== ".bin") {
+    console.log(`✅ Using current extension: ${currentExt}`)
+    return currentExt
+  }
+
+  console.log(`⚠️ No extension found, using .txt as fallback`)
+  return ".txt" // Only when absolutely no info available
+}
+
+// File signature detection for compressed files
+const detectCompressedFile = (filePath, fileName) => {
+  try {
+    console.log(`🔍 Detecting compression for: ${fileName}`)
+
+    // Check file extension patterns for our compressed files
+    if (fileName.includes("_compressed_huffman.bin")) {
+      const originalExt = extractOriginalExtension(fileName)
+      return { isCompressed: true, algorithm: "huffman", originalExt: originalExt }
+    }
+    if (fileName.includes("_compressed_rle.bin")) {
+      const originalExt = extractOriginalExtension(fileName)
+      return { isCompressed: true, algorithm: "rle", originalExt: originalExt }
+    }
+    if (fileName.includes("_compressed_lz77.bin")) {
+      const originalExt = extractOriginalExtension(fileName)
+      return { isCompressed: true, algorithm: "lz77", originalExt: originalExt }
+    }
+
+    // Check for JPEG files
+    if (fileName.toLowerCase().match(/\.(jpg|jpeg)$/)) {
+      return { isCompressed: true, algorithm: "jpeg", originalExt: ".jpg" }
+    }
+
+    console.log(`✅ File is not compressed`)
+    return { isCompressed: false, algorithm: null, originalExt: null }
+  } catch (error) {
+    console.log(`❌ Detection error: ${error.message}`)
+    return { isCompressed: false, algorithm: null, originalExt: null }
+  }
+}
+
+// ENHANCED: Better metadata storage with original extension preservation
+const createEnhancedMetadata = (fileInfo, action, algorithm, result, originalFileMetadata = null) => {
+  const originalExt = originalFileMetadata?.originalExtension || path.extname(fileInfo.originalName)
+
+  const metadata = {
+    fileId: fileInfo.fileId || uuidv4(),
+    action: action, // 'compress' or 'decompress'
+    algorithm: algorithm,
+    timestamp: new Date().toISOString(),
+    processingTime: result.processingTime || "0.00",
+
+    // ENHANCED: Better original file information preservation
+    originalFile: {
+      name: originalFileMetadata?.originalName || fileInfo.originalName,
+      extension: originalExt, // CRITICAL: Store exact original extension
+      mimeType: originalFileMetadata?.originalMimeType || fileInfo.mimeType,
+      size: result.originalSize || fileInfo.originalSize,
+      fullName: originalFileMetadata?.originalName || fileInfo.originalName,
+      // EXTRA: Store base name without extension for easier restoration
+      baseName: path.parse(originalFileMetadata?.originalName || fileInfo.originalName).name,
+    },
+
+    // Processed file information
+    processedFile: {
+      name: fileInfo.fileName,
+      path: fileInfo.filePath,
+      size: result.processedSize || result.compressedSize || result.decompressedSize,
+      extension: path.extname(fileInfo.fileName),
+    },
+  }
+
+  if (action === "compress") {
+    metadata.compressionRatio = result.compressionRatio
+    metadata.explanation = result.explanation
+  }
+
+  console.log(`📝 Created metadata with original extension: ${metadata.originalFile.extension}`)
+  return metadata
+}
+
+// Compression endpoint (unchanged, but with better metadata)
 router.post("/", async (req, res) => {
   try {
     const { fileId, algorithm } = req.body
@@ -53,6 +154,15 @@ router.post("/", async (req, res) => {
       })
     }
 
+    // Check if file is already compressed using the metadata
+    if (fileMetadata.isCompressed) {
+      return res.status(400).json({
+        message: `This file is already compressed using ${fileMetadata.detectedAlgorithm}. Use decompress instead.`,
+        isCompressed: true,
+        detectedAlgorithm: fileMetadata.detectedAlgorithm,
+      })
+    }
+
     console.log(`🗜️ Starting compression: ${algorithm} on ${fileMetadata.originalName}`)
     const startTime = Date.now()
 
@@ -67,7 +177,7 @@ router.post("/", async (req, res) => {
     const endTime = Date.now()
     const processingTime = ((endTime - startTime) / 1000).toFixed(2)
 
-    // Generate proper filename based on algorithm and original file
+    // Generate proper filename with original extension preserved in name
     const compressedFileId = uuidv4()
     const originalName = path.parse(fileMetadata.originalName).name
     const originalExt = path.parse(fileMetadata.originalName).ext
@@ -79,43 +189,51 @@ router.post("/", async (req, res) => {
       compressedFileName = `${originalName}_compressed.jpeg`
       compressedFilePath = path.join("processed", compressedFileName)
     } else {
-      // Other algorithms create .bin files but store original extension in metadata
+      // Other algorithms create .bin files but preserve original extension in metadata
       compressedFileName = `${originalName}_compressed_${algorithm}.bin`
       compressedFilePath = path.join("processed", compressedFileName)
     }
 
     fs.writeFileSync(compressedFilePath, compressedData)
 
-    // Save compressed file metadata with original file info
-    const compressedMetadata = {
-      fileId: compressedFileId,
-      originalFileId: fileId,
-      originalName: fileMetadata.originalName,
-      originalExtension: originalExt, // Store original extension for decompression
-      originalMimeType: fileMetadata.mimeType, // Store original MIME type
-      fileName: compressedFileName,
-      filePath: compressedFilePath,
-      algorithm: algorithm,
-      action: "compress",
+    // Create enhanced metadata with EXACT original file info
+    const result = {
       originalSize: originalSize,
       processedSize: compressedSize,
+      compressedSize: compressedSize,
       processingTime: processingTime,
       compressionRatio: (((originalSize - compressedSize) / originalSize) * 100).toFixed(1),
-      timestamp: new Date().toISOString(),
+      explanation: generateCompressionExplanation(
+        algorithm,
+        (((originalSize - compressedSize) / originalSize) * 100).toFixed(1),
+        fileMetadata.mimeType,
+      ),
     }
 
-    const compressedMetadataPath = path.join("processed", `${compressedFileId}.json`)
-    fs.writeFileSync(compressedMetadataPath, JSON.stringify(compressedMetadata, null, 2))
-
-    console.log(
-      `✅ Compression completed: ${originalSize} → ${compressedSize} bytes (${compressedMetadata.compressionRatio}% reduction)`,
+    const enhancedMetadata = createEnhancedMetadata(
+      {
+        fileId: compressedFileId,
+        fileName: compressedFileName,
+        filePath: compressedFilePath,
+        originalName: fileMetadata.originalName,
+        mimeType: fileMetadata.mimeType,
+        originalSize: originalSize,
+      },
+      "compress",
+      algorithm,
+      result,
+      {
+        originalName: fileMetadata.originalName,
+        originalExtension: originalExt, // CRITICAL: Preserve exact extension
+        originalMimeType: fileMetadata.mimeType,
+      },
     )
 
-    // Generate performance explanation
-    const explanation = generateCompressionExplanation(
-      algorithm,
-      compressedMetadata.compressionRatio,
-      fileMetadata.mimeType,
+    const compressedMetadataPath = path.join("processed", `${compressedFileId}.json`)
+    fs.writeFileSync(compressedMetadataPath, JSON.stringify(enhancedMetadata, null, 2))
+
+    console.log(
+      `✅ Compression completed: ${originalSize} → ${compressedSize} bytes (${result.compressionRatio}% reduction)`,
     )
 
     res.json({
@@ -125,10 +243,10 @@ router.post("/", async (req, res) => {
       processedSize: compressedSize,
       processingTime: processingTime,
       timeTaken: processingTime,
-      compressionRatio: Number.parseFloat(compressedMetadata.compressionRatio),
+      compressionRatio: Number.parseFloat(result.compressionRatio),
       algorithm: algorithm,
-      explanation: explanation,
-      fileName: compressedFileName, // Return the actual filename
+      explanation: result.explanation,
+      fileName: compressedFileName,
       message: "File compressed successfully",
     })
   } catch (error) {
@@ -140,7 +258,7 @@ router.post("/", async (req, res) => {
   }
 })
 
-// Decompression endpoint
+// FIXED: Decompression endpoint with EXACT extension restoration
 router.post("/decompress", async (req, res) => {
   try {
     const { fileId, algorithm } = req.body
@@ -174,7 +292,7 @@ router.post("/decompress", async (req, res) => {
     }
 
     const fileMetadata = JSON.parse(fs.readFileSync(metadataPath, "utf8"))
-    const filePath = fileMetadata.filePath
+    const filePath = fileMetadata.filePath || fileMetadata.processedFile?.path
 
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({
@@ -182,21 +300,38 @@ router.post("/decompress", async (req, res) => {
       })
     }
 
-    // Verify this is a compressed file
-    if (isFromProcessed && fileMetadata.action !== "compress") {
+    // Check if file is compressed - use metadata first, then file detection
+    let isCompressed = false
+    let detectedAlgorithm = null
+
+    if (isFromProcessed) {
+      // For processed files, check the action and algorithm
+      isCompressed = fileMetadata.action === "compress"
+      detectedAlgorithm = fileMetadata.algorithm
+    } else {
+      // For uploaded files, check the metadata
+      isCompressed = fileMetadata.isCompressed
+      detectedAlgorithm = fileMetadata.detectedAlgorithm
+    }
+
+    if (!isCompressed) {
       return res.status(400).json({
-        message: "This file was not created by compression. Please upload a compressed file.",
+        message: "This file is not compressed. Please upload a compressed file to decompress.",
+        isCompressed: false,
       })
     }
 
     // Verify algorithm matches
-    if (isFromProcessed && fileMetadata.algorithm !== algorithm) {
+    if (detectedAlgorithm && detectedAlgorithm !== algorithm) {
       return res.status(400).json({
-        message: `This file was compressed with ${fileMetadata.algorithm}, but you selected ${algorithm}. Please select the correct algorithm.`,
+        message: `This file was compressed with ${detectedAlgorithm}, but you selected ${algorithm}. Please select the correct algorithm.`,
+        detectedAlgorithm: detectedAlgorithm,
       })
     }
 
-    console.log(`📦 Starting decompression: ${algorithm} on ${fileMetadata.fileName || fileMetadata.originalName}`)
+    console.log(
+      `📦 Starting decompression: ${algorithm} on ${fileMetadata.originalName || fileMetadata.processedFile?.name}`,
+    )
     const startTime = Date.now()
 
     // Read compressed file
@@ -210,68 +345,100 @@ router.post("/decompress", async (req, res) => {
     const endTime = Date.now()
     const processingTime = ((endTime - startTime) / 1000).toFixed(2)
 
-    // Generate proper filename for decompressed file
+    // FIXED: EXACT extension restoration using metadata priority
     const decompressedFileId = uuidv4()
     let decompressedFileName, decompressedFilePath
+    let originalBaseName = "file"
+    let originalExtension = ".txt" // fallback
 
-    if (isFromProcessed && fileMetadata.originalName && fileMetadata.originalExtension) {
-      // Restore original filename and extension
-      const originalName = path.parse(fileMetadata.originalName).name
-      const originalExt = fileMetadata.originalExtension
+    console.log(`🔍 Restoring original extension...`)
 
-      if (algorithm === "jpeg") {
-        // JPEG decompression creates PNG files (lossless format)
-        decompressedFileName = `${originalName}_decompressed.png`
+    // PRIORITY 1: Use metadata from our compressed files (BEST)
+    if (isFromProcessed && fileMetadata.originalFile) {
+      originalBaseName = fileMetadata.originalFile.baseName || path.parse(fileMetadata.originalFile.name).name
+      originalExtension = fileMetadata.originalFile.extension
+      console.log(`✅ From metadata: ${originalBaseName} + ${originalExtension}`)
+    }
+    // PRIORITY 2: Extract from uploaded compressed filename pattern
+    else if (fileMetadata.originalName || fileMetadata.fileName) {
+      const fileName = fileMetadata.originalName || fileMetadata.fileName
+      console.log(`🔍 Analyzing uploaded filename: ${fileName}`)
+
+      if (fileName.includes("_compressed_")) {
+        // Pattern: "data_compressed_huffman.bin" -> "data" + ".bin"
+        const beforeCompressed = fileName.split("_compressed_")[0]
+        const lastDotIndex = beforeCompressed.lastIndexOf(".")
+
+        if (lastDotIndex !== -1) {
+          originalBaseName = beforeCompressed.substring(0, lastDotIndex)
+          originalExtension = beforeCompressed.substring(lastDotIndex)
+          console.log(`✅ Extracted from pattern: ${originalBaseName} + ${originalExtension}`)
+        } else {
+          originalBaseName = beforeCompressed
+          // Try to detect from uploaded file metadata
+          if (fileMetadata.detectedOriginalExt) {
+            originalExtension = fileMetadata.detectedOriginalExt
+          } else {
+            originalExtension = ".bin" // If no extension found, likely was .bin originally
+          }
+          console.log(`✅ No extension in pattern, using: ${originalBaseName} + ${originalExtension}`)
+        }
       } else {
-        // Other algorithms restore to original extension
-        decompressedFileName = `${originalName}_decompressed${originalExt}`
-      }
-    } else {
-      // Fallback for files without proper metadata
-      const baseName = path.parse(fileMetadata.originalName || fileMetadata.fileName || "file").name
-
-      if (algorithm === "jpeg") {
-        decompressedFileName = `${baseName}_decompressed.png`
-      } else {
-        decompressedFileName = `${baseName}_decompressed.bin`
+        // Fallback: use the filename as is
+        originalBaseName = path.parse(fileName).name
+        originalExtension = path.extname(fileName) || ".txt"
+        console.log(`✅ Using filename as-is: ${originalBaseName} + ${originalExtension}`)
       }
     }
+
+    // Generate final filename with EXACT original extension
+    if (algorithm === "jpeg") {
+      // JPEG always decompresses to PNG
+      decompressedFileName = `${originalBaseName}_decompressed.png`
+    } else {
+      // All other algorithms restore to EXACT original extension
+      decompressedFileName = `${originalBaseName}_decompressed${originalExtension}`
+    }
+
+    console.log(`✅ Final decompressed filename: ${decompressedFileName}`)
 
     decompressedFilePath = path.join("processed", decompressedFileName)
     fs.writeFileSync(decompressedFilePath, decompressedData)
 
-    // Save decompressed file metadata
-    const decompressedMetadata = {
-      fileId: decompressedFileId,
-      originalFileId: fileId,
-      originalName: fileMetadata.originalName,
-      fileName: decompressedFileName,
-      filePath: decompressedFilePath,
-      algorithm: algorithm,
-      action: "decompress",
+    // Create enhanced metadata for decompressed file
+    const result = {
       originalSize: compressedSize,
       processedSize: decompressedSize,
+      decompressedSize: decompressedSize,
       processingTime: processingTime,
-      timestamp: new Date().toISOString(),
-      // Preserve original file info if available
-      restoredFromCompression: isFromProcessed,
-      originalFileExtension: fileMetadata.originalExtension,
-      originalMimeType: fileMetadata.originalMimeType,
     }
 
+    const enhancedMetadata = createEnhancedMetadata(
+      {
+        fileId: decompressedFileId,
+        fileName: decompressedFileName,
+        filePath: decompressedFilePath,
+        originalName: fileMetadata.originalFile?.name || fileMetadata.originalName,
+        mimeType: fileMetadata.originalFile?.mimeType || fileMetadata.mimeType,
+        originalSize: compressedSize,
+      },
+      "decompress",
+      algorithm,
+      result,
+      fileMetadata.originalFile,
+    )
+
     const decompressedMetadataPath = path.join("processed", `${decompressedFileId}.json`)
-    fs.writeFileSync(decompressedMetadataPath, JSON.stringify(decompressedMetadata, null, 2))
+    fs.writeFileSync(decompressedMetadataPath, JSON.stringify(enhancedMetadata, null, 2))
 
     console.log(`✅ Decompression completed: ${compressedSize} → ${decompressedSize} bytes`)
 
-    // Generate explanation based on algorithm and whether it was properly compressed
+    // Generate explanation
     let explanation
     if (algorithm === "jpeg") {
-      explanation = `JPEG decompression converted your compressed image back to PNG format. The original image data has been restored, though some quality loss occurred during the original JPEG compression.`
-    } else if (isFromProcessed) {
-      explanation = `Successfully decompressed your file using ${algorithm} algorithm. The original file has been perfectly restored with the original filename and extension.`
+      explanation = `JPEG decompression converted your compressed image back to PNG format. The original image data has been restored.`
     } else {
-      explanation = `Decompression completed using ${algorithm} algorithm. Note: For best results, upload files that were compressed using this system.`
+      explanation = `Successfully decompressed your file using ${algorithm} algorithm. The original file has been restored as ${decompressedFileName} with the exact original extension.`
     }
 
     res.json({

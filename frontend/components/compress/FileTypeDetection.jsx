@@ -1,7 +1,16 @@
 "use client"
 
-export default function FileTypeDetection({ file, detectedType }) {
-  const getTypeInfo = (type) => {
+export default function FileTypeDetection({ file, detectedType, compressionStatus }) {
+  const getTypeInfo = (type, isCompressed) => {
+    if (compressionStatus?.isCompressed) {
+      return {
+        label: `Compressed File (${compressionStatus.algorithm?.toUpperCase()})`,
+        icon: "🗜️",
+        color: "purple",
+        description: `Already compressed using ${compressionStatus.algorithm} algorithm`,
+      }
+    }
+
     switch (type) {
       case "text":
         return {
@@ -34,7 +43,7 @@ export default function FileTypeDetection({ file, detectedType }) {
     }
   }
 
-  const typeInfo = getTypeInfo(detectedType)
+  const typeInfo = getTypeInfo(detectedType, compressionStatus?.isCompressed)
   const colorClasses = {
     blue: "bg-blue-50 border-blue-200 text-blue-800",
     green: "bg-green-50 border-green-200 text-green-800",

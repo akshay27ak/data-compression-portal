@@ -1,6 +1,6 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://data-compression-portal-production.up.railway.app"
-// const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
 
+// Upload file
 export const uploadFile = async (file) => {
   const formData = new FormData()
   formData.append("file", file)
@@ -11,13 +11,14 @@ export const uploadFile = async (file) => {
   })
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}))
-    throw new Error(errorData.message || "Upload failed")
+    const error = await response.json()
+    throw new Error(error.message || "Upload failed")
   }
 
   return response.json()
 }
 
+// Compress file
 export const compressFile = async (fileId, algorithm) => {
   const response = await fetch(`${API_BASE_URL}/compress`, {
     method: "POST",
@@ -31,15 +32,16 @@ export const compressFile = async (fileId, algorithm) => {
   })
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}))
-    throw new Error(errorData.message || "Compression failed")
+    const error = await response.json()
+    throw new Error(error.message || "Compression failed")
   }
 
   return response.json()
 }
 
+// Decompress file - FIX: Make sure this calls the correct endpoint
 export const decompressFile = async (fileId, algorithm) => {
-  const response = await fetch(`${API_BASE_URL}/decompress`, {
+  const response = await fetch(`${API_BASE_URL}/compress/decompress`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -51,13 +53,14 @@ export const decompressFile = async (fileId, algorithm) => {
   })
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}))
-    throw new Error(errorData.message || "Decompression failed")
+    const error = await response.json()
+    throw new Error(error.message || "Decompression failed")
   }
 
   return response.json()
 }
 
+// Download file
 export const downloadFile = async (fileId, fileName) => {
   const response = await fetch(`${API_BASE_URL}/download/${fileId}`)
 
@@ -66,25 +69,24 @@ export const downloadFile = async (fileId, fileName) => {
   }
 
   const blob = await response.blob()
-
-  // Create download link
-  const url = URL.createObjectURL(blob)
+  const url = window.URL.createObjectURL(blob)
   const a = document.createElement("a")
+  a.style.display = "none"
   a.href = url
-  a.download = fileName || "processed_file"
+  a.download = fileName || "download"
   document.body.appendChild(a)
   a.click()
+  window.URL.revokeObjectURL(url)
   document.body.removeChild(a)
-  URL.revokeObjectURL(url)
-
-  return blob
 }
 
+// Get file info
 export const getFileInfo = async (fileId) => {
   const response = await fetch(`${API_BASE_URL}/file/${fileId}`)
 
   if (!response.ok) {
-    throw new Error("Failed to get file info")
+    const error = await response.json()
+    throw new Error(error.message || "Failed to get file info")
   }
 
   return response.json()
