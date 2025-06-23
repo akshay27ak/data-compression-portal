@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://data-compression-portal-production.up.railway.app" || "http://localhost:5000"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://data-compression-portal-production.up.railway.app"
 
 // Upload file
 export const uploadFile = async (file) => {
