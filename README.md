@@ -1,179 +1,152 @@
 # Data Compression & Decompression Portal
 
-A high-performance web application for file compression and decompression using multiple algorithms. Built with Next.js frontend and Node.js backend API.
+A comprehensive web application for file compression and decompression using various algorithms including Huffman Coding, LZ77, Run-Length Encoding (RLE), and JPEG compression.
 
-## 🌐 Live Application
+## Live Application
 
 - **Frontend (Vercel)**: https://data-compression-portal-tawny.vercel.app
 - **Backend API (Railway)**: https://data-compression-portal-production.up.railway.app
 
-## 🚀 Features
+## Live Demo 
 
-- **4 Compression Algorithms**: Huffman, RLE, LZ77, JPEG
-- **Web Interface**: Modern, responsive React-based UI
-- **File Upload/Download**: Secure file handling with drag & drop
-- **Real-time Processing**: Live compression/decompression with progress tracking
-- **Algorithm Comparison**: Performance metrics and recommendations
-- **JPEG Support**: Creates industry-standard .jpg files
-- **Auto-suggestion**: Smart algorithm recommendations based on file type
+[View the deployed application here](https://drive.google.com/drive/u/0/folders/10KxajoXuBNVrQwWgkD7KwPZV9Ize2TcP)
 
-## 🔧 Algorithms
 
-### JPEG Compression
-- **Type**: Lossy compression
-- **Best for**: Photographic images, complex images with gradients
-- **Output**: Creates .jpeg files (industry standard)
-- **Compression**: 80-95% size reduction
-- **Decompression**: Converts to PNG format for lossless storage
+## Features
 
-### Huffman Coding
-- **Type**: Lossless compression
-- **Best for**: Text files, source code, structured data
-- **Method**: Variable-length encoding based on character frequency
-- **Compression**: 40-60% typical reduction
+### Compression Algorithms
+- **Huffman Coding**: Optimal for text files with frequency-based compression
+- **LZ77**: Sliding window compression ideal for binary files and general data
+- **Run-Length Encoding (RLE)**: Perfect for files with repetitive data patterns
+- **JPEG Compression**: Specialized lossy compression for image files
 
-### Run-Length Encoding (RLE)
-- **Type**: Lossless compression
-- **Best for**: Images with uniform areas, simple graphics
-- **Method**: Replace consecutive identical values with count-value pairs
-- **Compression**: 30-70% depending on data patterns
+### Supported File Types
+- **Text Files**: `.txt` - Compressed using Huffman Coding
+- **Binary Files**: `.bin` - Compressed using LZ77 algorithm
+- **Image Files**: `.jpg`, `.jpeg`, `.png` - Compressed using JPEG algorithm
+- **Unsupported Files**: All other file types will show an error message
 
-### LZ77
-- **Type**: Lossless compression
-- **Best for**: General-purpose files, text documents
-- **Method**: Dictionary-based sliding window compression
-- **Compression**: 50-70% typical reduction
+### Core Functionality
+- **File Upload**: Drag-and-drop or click to upload files
+- **Automatic Detection**: Smart detection of compressed files for decompression
+- **Real-time Processing**: Live compression/decompression with progress indicators
+- **File Download**: Download processed files with correct extensions restored
 
-## 📋 API Endpoints
+### Analytics & Insights
+- **Algorithm Comparison**: Compare efficiency across different algorithms
+- **Performance Metrics**: Processing time and compression ratio analysis
+- **Educational Content**: Learn about compression algorithms and their use cases
 
-Base URL: `https://data-compression-portal-production.up.railway.app`
+### Error Handling
+- **File Size Validation**: Maximum 100MB file size limit
+- **File Type Validation**: Proper feedback for unsupported file extensions
+- **Compression Errors**: Clear error messages for failed operations
+- **Network Error Handling**: Graceful handling of API failures
 
-- `POST /upload` - Upload files for processing
-- `POST /compress` - Compress uploaded files  
-- `POST /decompress` - Decompress files (restores original format)
-- `GET /download/:fileId` - Download processed files
-- `GET /health` - API health check
-- `GET /file/:fileId` - Get file information
+### User Experience
+- **Responsive Design**: Works seamlessly on desktop and mobile devices
+- **Dark/Light Mode**: Toggle between themes for comfortable viewing
+- **Interactive UI**: Smooth animations and real-time feedback
+- **Progress Tracking**: Visual indicators for upload and processing status
 
-## 🧪 Testing the API
+## Technology Stack
 
-### Health Check
-\`\`\`bash
-curl https://data-compression-portal-production.up.railway.app/health
+### Frontend
+- **Next.js 14**: React framework with App Router
+- **React 18**: Modern React with hooks and concurrent features
+- **Tailwind CSS**: Utility-first CSS framework
+- **shadcn/ui**: High-quality UI components
+- **Lucide React**: Beautiful icon library
+
+### Backend
+- **Node.js**: JavaScript runtime environment
+- **Express.js**: Web application framework
+- **Multer**: File upload middleware
+- **Custom Algorithms**: Hand-implemented compression algorithms
+
+## Getting Started to run locally
+
+### Prerequisites
+- Node.js 18+ installed
+- npm or yarn package manager
+
+### Installation
+
+1. **Clone the repository**
+   \`\`\`bash
+   git clone <repository-url>
+   cd data-compression-portal
+   \`\`\`
+
+2. **Install Backend Dependencies**
+   \`\`\`bash
+   cd backend
+   npm install
+   \`\`\`
+
+3. **Install Frontend Dependencies**
+   \`\`\`bash
+   cd ../frontend
+   npm install
+   \`\`\`
+
+4. **Start the Backend Server**
+   \`\`\`bash
+   cd ../backend
+   npm start
+   \`\`\`
+   Backend will run on `http://localhost:5000`
+
+5. **Start the Frontend Development Server**
+   \`\`\`bash
+   cd ../frontend
+   npm run dev
+   \`\`\`
+   Frontend will run on `http://localhost:3000`
+
+### Environment Variables
+
+Create a `.env.local` file in the frontend directory:
+\`\`\`env
+NEXT_PUBLIC_API_URL=http://localhost:5000
 \`\`\`
 
-**Expected Response:**
-\`\`\`json
-{
-  "status": "OK",
-  "timestamp": "2024-01-XX...",
-  "uptime": 123.45,
-  "algorithms": ["huffman", "rle", "lz77", "jpeg"]
-}
-\`\`\`
+## Usage Guide
 
-### Upload and Compress Example
-\`\`\`bash
-# Upload a file
-curl -X POST -F "file=@example.jpg" \
-  https://data-compression-portal-production.up.railway.app/upload
+### Compressing Files
 
-# Compress with JPEG (for images)
-curl -X POST -H "Content-Type: application/json" \
-  -d '{"fileId":"your-file-id","algorithm":"jpeg"}' \
-  https://data-compression-portal-production.up.railway.app/compress
+1. **Upload a File**: 
+   - Drag and drop a file or click to browse
+   - Supported formats: `.txt`, `.bin`, `.jpg`, `.jpeg`, `.png`
+   - Maximum file size: 100MB
 
-# Download compressed file
-curl -O https://data-compression-portal-production.up.railway.app/download/compressed-file-id
-\`\`\`
+2. **Select Algorithm** (Auto-selected based on file type):
+   - Text files → Huffman Coding
+   - Binary files → LZ77
+   - Image files → JPEG
 
-## 🎯 How to Use
+3. **Process**: Click "Compress File" and wait for processing
 
-1. **Visit the Web App**: https://data-compression-portal-tawny.vercel.app
-2. **Upload Your File**: Drag & drop or click to browse (max 100MB)
-3. **Choose Algorithm**: Auto-suggest or manual selection
-4. **Process File**: Click Compress or Decompress
-5. **Download Result**: Get your processed file
+4. **Download**: Download the compressed file with `.bin` extension
 
-## 📊 Algorithm Performance
+### Decompressing Files
 
-The application automatically suggests the best algorithm based on your file type:
+1. **Upload Compressed File**: Upload a previously compressed `.bin` file
 
-- **Text Files** → Huffman Coding (optimal for character frequency analysis)
-- **Images** → JPEG Compression (industry standard with high compression ratios)
-- **Binary Files** → LZ77 (excellent general-purpose compression)
+2. **Auto-Detection**: System automatically detects the compression algorithm
 
-## 🔄 File Processing Flow
+3. **Process**: Click "Decompress File"
 
-### Compression
-1. **Upload** → File stored securely on server
-2. **Analysis** → File type detection and algorithm suggestion
-3. **Compression** → Selected algorithm processes the file
-4. **Download** → Compressed file with appropriate extension (.jpeg, .bin)
+4. **Download**: Download the restored file with original extension
 
-### Decompression
-1. **Upload** → Compressed file from this system
-2. **Detection** → Algorithm and metadata extraction
-3. **Decompression** → Restore original file format
-4. **Download** → Original file with correct extension restored
+### File Type Support
 
-## 📸 JPEG Specific Features
+| File Extension | Algorithm | Status |
+|---------------|-----------|---------|
+| `.txt` | Huffman Coding | ✅ Supported |
+| `.bin` | LZ77 | ✅ Supported |
+| `.jpg`, `.jpeg`, `.png` | JPEG | ✅ Supported |
+| Other extensions | - | ❌ Not Supported |
 
-- **Lossy Compression**: Optimized for human visual perception
-- **Industry Standard**: Creates .jpeg files compatible with all image viewers
-- **Quality Control**: Balanced compression (80% quality) for optimal size/quality ratio
-- **Decompression**: Converts back to PNG format for lossless storage
-- **Image Detection**: Automatically detects image vs non-image data
 
-## 🛡️ Security & Limits
 
-- **File Size Limit**: 100MB maximum
-- **Secure Upload**: Files processed server-side with automatic cleanup
-- **CORS Protection**: Configured for secure cross-origin requests
-- **Auto Cleanup**: Old files automatically removed after 24 hours
-- **Error Handling**: Comprehensive error handling and user feedback
-
-## 🏗️ Architecture
-
-- **Frontend**: Next.js 15 with React, deployed on Vercel
-- **Backend**: Node.js with Express, deployed on Railway
-- **File Storage**: Temporary server-side storage with automatic cleanup
-- **Algorithms**: Custom implementations of compression algorithms
-- **Image Processing**: Sharp and Jimp libraries for JPEG handling
-
-## 📈 Performance Metrics
-
-The application tracks and displays:
-- **Compression Ratios**: Percentage of size reduction achieved
-- **Processing Speed**: Time taken for compression/decompression
-- **File Size Comparison**: Before and after file sizes
-- **Algorithm Efficiency**: Performance ratings and explanations
-
-## 🔗 Technology Stack
-
-**Frontend:**
-- Next.js 15 (React framework)
-- Tailwind CSS (styling)
-- Vercel (deployment)
-
-**Backend:**
-- Node.js with Express
-- Multer (file uploads)
-- Sharp & Jimp (image processing)
-- Railway (deployment)
-
-## 📞 Support
-
-For issues or questions:
-- **Frontend Issues**: Check browser console for errors
-- **API Issues**: Verify network connectivity to Railway backend
-- **File Processing**: Ensure files are under 100MB limit
-- **Algorithm Questions**: Refer to the Algorithms page in the web app
-
-## 🎉 Try It Now!
-
-Visit **https://data-compression-portal-tawny.vercel.app** and start compressing your files with advanced algorithms!
-
----
-
-**Built with ❤️ using modern web technologies for optimal performance and user experience.**

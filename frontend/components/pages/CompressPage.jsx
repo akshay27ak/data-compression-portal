@@ -24,9 +24,38 @@ export default function CompressPage() {
   const [downloadReady, setDownloadReady] = useState(false)
   const [fileStatus, setFileStatus] = useState({ isCompressed: false, detectedAlgorithm: null })
 
+  // File type validation function
+  const validateFileType = (file) => {
+    const fileName = file.name.toLowerCase()
+    const supportedExtensions = [".txt", ".bin", ".jpg", ".jpeg", ".png"]
+
+    // Check if file has an extension
+    const lastDotIndex = fileName.lastIndexOf(".")
+    if (lastDotIndex === -1) {
+      return {
+        isValid: false,
+        error: "File must have an extension. Supported formats: .txt, .bin, .jpg, .jpeg, .png",
+      }
+    }
+
+    const fileExtension = fileName.substring(lastDotIndex)
+
+    // Check if extension is supported
+    const isSupported = supportedExtensions.includes(fileExtension)
+
+    if (!isSupported) {
+      return {
+        isValid: false,
+        error: `File type "${fileExtension}" is not supported. Please upload files with these extensions: .txt, .bin, .jpg, .jpeg, .png`,
+      }
+    }
+
+    return { isValid: true }
+  }
+
   const handleFileSelect = async (file) => {
     // Reset all states when new file is selected
-    setSelectedFile(file)
+    setSelectedFile(null)
     setCompressionResult(null)
     setDownloadReady(false)
     setError("")
@@ -38,6 +67,17 @@ export default function CompressPage() {
       setSelectedAlgorithm("huffman")
       return
     }
+
+    // Validate file type BEFORE processing
+    const validation = validateFileType(file)
+    if (!validation.isValid) {
+      setError(validation.error)
+      console.log("❌ File validation failed:", validation.error)
+      return // Stop processing if file type is not supported
+    }
+
+    console.log("✅ File validation passed for:", file.name)
+    setSelectedFile(file) // Only set selected file if validation passes
 
     // Upload file to backend for processing and detection
     try {
