@@ -37,16 +37,33 @@ const detectCompressedFile = (filePath, fileName) => {
 }
 
 const extractOriginalExtension = (fileName) => {
-  // Extract original extension from filename like "document_compressed_huffman.bin"
+  console.log(`🔍 Extracting original extension from: ${fileName}`)
+
+  // Extract original extension from filename like "document.bin_compressed_huffman.bin"
   const parts = fileName.split("_compressed_")
   if (parts.length > 1) {
     const originalName = parts[0]
     const lastDot = originalName.lastIndexOf(".")
     if (lastDot !== -1) {
-      return originalName.substring(lastDot)
+      const ext = originalName.substring(lastDot)
+      console.log(`✅ Found original extension: ${ext}`)
+      return ext
+    } else {
+      // If no extension in original name, it might be a binary file
+      console.log(`⚠️ No extension in original name, defaulting to .bin`)
+      return ".bin"
     }
   }
-  return ".txt" // Default fallback
+
+  // If not our compressed format, check current extension
+  const currentExt = path.extname(fileName)
+  if (currentExt && currentExt !== ".bin") {
+    console.log(`✅ Using current extension: ${currentExt}`)
+    return currentExt
+  }
+
+  console.log(`⚠️ No extension found, using .bin as fallback`)
+  return ".bin" // Default for binary files
 }
 
 module.exports = {

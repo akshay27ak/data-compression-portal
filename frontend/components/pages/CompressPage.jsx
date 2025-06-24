@@ -44,7 +44,7 @@ export default function CompressPage() {
       setIsProcessing(true)
       setProcessingAction("upload")
 
-      console.log("🔄 Uploading file:", file.name)
+      console.log("🔄 Uploading file:", file.name, "Type:", file.type, "Size:", file.size)
       const uploadResult = await uploadFile(file)
       console.log("✅ Upload result:", uploadResult)
 
@@ -59,6 +59,11 @@ export default function CompressPage() {
       setFileStatus(status)
 
       console.log("📊 File status:", status)
+      console.log("📋 Original file info:", {
+        name: file.name,
+        type: file.type,
+        extension: file.name.split(".").pop(),
+      })
 
       // Handle algorithm selection based on file status
       if (status.isCompressed) {
@@ -146,9 +151,13 @@ export default function CompressPage() {
           result.explanation || getPerformanceExplanation(selectedAlgorithm, detectedFileType, result),
         fileId: result.fileId || result.id,
         compressionRatio: result.compressionRatio,
+        fileName: result.fileName, // CRITICAL: Pass the filename from backend
       }
 
       setCompressionResult(formattedResult)
+      console.log(`🔍 CompressPage - Setting compressionResult:`, formattedResult)
+      console.log(`🔍 CompressPage - fileId being passed to DownloadSection:`, formattedResult.fileId)
+      console.log(`🔍 CompressPage - fileName being passed to DownloadSection:`, formattedResult.fileName)
       setDownloadReady(true)
     } catch (err) {
       console.error("❌ Compression error:", err)
@@ -191,9 +200,13 @@ export default function CompressPage() {
         performanceExplanation:
           result.explanation || `Successfully decompressed your file using ${selectedAlgorithm} algorithm.`,
         fileId: result.fileId || result.id,
+        fileName: result.fileName, // CRITICAL: Pass the filename from backend
       }
 
       setCompressionResult(formattedResult)
+      console.log(`🔍 CompressPage - Setting compressionResult:`, formattedResult)
+      console.log(`🔍 CompressPage - fileId being passed to DownloadSection:`, formattedResult.fileId)
+      console.log(`🔍 CompressPage - fileName being passed to DownloadSection:`, formattedResult.fileName)
       setDownloadReady(true)
     } catch (err) {
       console.error("❌ Decompression error:", err)
@@ -241,6 +254,7 @@ export default function CompressPage() {
             disabled={!selectedFile || !uploadedFileId}
             selectedAlgorithm={selectedAlgorithm}
             fileStatus={fileStatus}
+            hasFile={!!selectedFile && !!uploadedFileId} // NEW: Pass this prop
           />
         </div>
       </div>

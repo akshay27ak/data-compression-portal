@@ -109,6 +109,16 @@ const createEnhancedMetadata = (fileInfo, action, algorithm, result, originalFil
       size: result.processedSize || result.compressedSize || result.decompressedSize,
       extension: path.extname(fileInfo.fileName),
     },
+
+    // CRITICAL: Store original file details for proper decompression
+    compressionMetadata: {
+      originalExtension: originalExt,
+      originalMimeType: originalFileMetadata?.originalMimeType || fileInfo.mimeType,
+      originalBaseName: path.parse(originalFileMetadata?.originalName || fileInfo.originalName).name,
+      originalFullName: originalFileMetadata?.originalName || fileInfo.originalName,
+      isCompressed: action === "compress",
+      compressionAlgorithm: algorithm,
+    },
   }
 
   if (action === "compress") {
@@ -117,10 +127,11 @@ const createEnhancedMetadata = (fileInfo, action, algorithm, result, originalFil
   }
 
   console.log(`📝 Created metadata with original extension: ${metadata.originalFile.extension}`)
+  console.log(`📝 Compression metadata:`, metadata.compressionMetadata)
   return metadata
 }
 
-// Compression endpoint (unchanged, but with better metadata)
+// Compression endpoint
 router.post("/", async (req, res) => {
   try {
     const { fileId, algorithm } = req.body
@@ -164,6 +175,12 @@ router.post("/", async (req, res) => {
     }
 
     console.log(`🗜️ Starting compression: ${algorithm} on ${fileMetadata.originalName}`)
+    console.log(`📋 Original file metadata:`, {
+      name: fileMetadata.originalName,
+      mimeType: fileMetadata.mimeType,
+      extension: path.extname(fileMetadata.originalName),
+    })
+
     const startTime = Date.now()
 
     // Read original file
@@ -216,7 +233,7 @@ router.post("/", async (req, res) => {
         fileName: compressedFileName,
         filePath: compressedFilePath,
         originalName: fileMetadata.originalName,
-        mimeType: fileMetadata.mimeType,
+        mimeType: fileMetadata.mimeType, // Use ORIGINAL file's MIME type
         originalSize: originalSize,
       },
       "compress",
@@ -225,7 +242,7 @@ router.post("/", async (req, res) => {
       {
         originalName: fileMetadata.originalName,
         originalExtension: originalExt, // CRITICAL: Preserve exact extension
-        originalMimeType: fileMetadata.mimeType,
+        originalMimeType: fileMetadata.mimeType, // CRITICAL: Preserve original MIME type
       },
     )
 
@@ -258,7 +275,7 @@ router.post("/", async (req, res) => {
   }
 })
 
-// FIXED: Decompression endpoint with EXACT extension restoration
+// FIXED: Decompression endpoint with EXACT extension restoration using LINKED metadata
 router.post("/decompress", async (req, res) => {
   try {
     const { fileId, algorithm } = req.body
@@ -345,27 +362,47 @@ router.post("/decompress", async (req, res) => {
     const endTime = Date.now()
     const processingTime = ((endTime - startTime) / 1000).toFixed(2)
 
-    // FIXED: EXACT extension restoration using metadata priority
+    // FIXED: EXACT extension restoration using LINKED original metadata
     const decompressedFileId = uuidv4()
     let decompressedFileName, decompressedFilePath
     let originalBaseName = "file"
     let originalExtension = ".txt" // fallback
 
-    console.log(`🔍 Restoring original extension...`)
+    console.log(`🔍 Restoring original extension from LINKED metadata...`)
+    console.log(`📋 Available metadata:`, JSON.stringify(fileMetadata, null, 2))
 
-    // PRIORITY 1: Use metadata from our compressed files (BEST)
-    if (isFromProcessed && fileMetadata.originalFile) {
+    // PRIORITY 1: Use linkedCompressionMetadata (NEW - from upload linking)
+    if (fileMetadata.linkedCompressionMetadata && fileMetadata.linkedCompressionMetadata.compressionMetadata) {
+      const linkedMeta = fileMetadata.linkedCompressionMetadata.compressionMetadata
+      originalBaseName = linkedMeta.originalBaseName || "file"
+      originalExtension = linkedMeta.originalExtension || ".txt"
+      console.log(`✅ From linkedCompressionMetadata (ORIGINAL): ${originalBaseName} + ${originalExtension}`)
+    }
+    // PRIORITY 2: Use originalFileMetadata from upload (ENHANCED)
+    else if (fileMetadata.originalFileMetadata) {
+      originalBaseName = fileMetadata.originalFileMetadata.baseName || "file"
+      originalExtension = fileMetadata.originalFileMetadata.extension || ".txt"
+      console.log(`✅ From originalFileMetadata (UPLOAD): ${originalBaseName} + ${originalExtension}`)
+    }
+    // PRIORITY 3: Use compressionMetadata (from processed files)
+    else if (fileMetadata.compressionMetadata) {
+      originalBaseName = fileMetadata.compressionMetadata.originalBaseName || "file"
+      originalExtension = fileMetadata.compressionMetadata.originalExtension || ".txt"
+      console.log(`✅ From compressionMetadata (PROCESSED): ${originalBaseName} + ${originalExtension}`)
+    }
+    // PRIORITY 4: Use originalFile metadata (existing)
+    else if (fileMetadata.originalFile) {
       originalBaseName = fileMetadata.originalFile.baseName || path.parse(fileMetadata.originalFile.name).name
       originalExtension = fileMetadata.originalFile.extension
-      console.log(`✅ From metadata: ${originalBaseName} + ${originalExtension}`)
+      console.log(`✅ From originalFile metadata (EXISTING): ${originalBaseName} + ${originalExtension}`)
     }
-    // PRIORITY 2: Extract from uploaded compressed filename pattern
+    // PRIORITY 5: Extract from uploaded compressed filename pattern
     else if (fileMetadata.originalName || fileMetadata.fileName) {
       const fileName = fileMetadata.originalName || fileMetadata.fileName
       console.log(`🔍 Analyzing uploaded filename: ${fileName}`)
 
       if (fileName.includes("_compressed_")) {
-        // Pattern: "data_compressed_huffman.bin" -> "data" + ".bin"
+        // Pattern: "data.txt_compressed_huffman.bin" -> "data" + ".txt"
         const beforeCompressed = fileName.split("_compressed_")[0]
         const lastDotIndex = beforeCompressed.lastIndexOf(".")
 
@@ -375,12 +412,7 @@ router.post("/decompress", async (req, res) => {
           console.log(`✅ Extracted from pattern: ${originalBaseName} + ${originalExtension}`)
         } else {
           originalBaseName = beforeCompressed
-          // Try to detect from uploaded file metadata
-          if (fileMetadata.detectedOriginalExt) {
-            originalExtension = fileMetadata.detectedOriginalExt
-          } else {
-            originalExtension = ".bin" // If no extension found, likely was .bin originally
-          }
+          originalExtension = ".bin" // Default for binary files
           console.log(`✅ No extension in pattern, using: ${originalBaseName} + ${originalExtension}`)
         }
       } else {

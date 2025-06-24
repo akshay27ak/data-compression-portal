@@ -8,6 +8,7 @@ export default function ActionButtons({
   disabled,
   selectedAlgorithm,
   fileStatus,
+  hasFile, // NEW: Add this prop to know if file is uploaded
 }) {
   const canCompress = !fileStatus?.isCompressed && !disabled
   const canDecompress = fileStatus?.isCompressed && !disabled
@@ -94,8 +95,8 @@ export default function ActionButtons({
         </button>
       </div>
 
-      {/* Status Messages */}
-      {fileStatus?.isCompressed ? (
+      {/* Status Messages - ONLY show when file is uploaded */}
+      {hasFile && fileStatus?.isCompressed ? (
         <div className="mt-3 p-3 bg-purple-50 border border-purple-200 rounded-lg">
           <div className="flex items-center gap-2">
             <span className="text-purple-600">🗜️</span>
@@ -107,7 +108,7 @@ export default function ActionButtons({
             </div>
           </div>
         </div>
-      ) : (
+      ) : hasFile && !fileStatus?.isCompressed ? (
         <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
           <div className="flex items-center gap-2">
             <span className="text-green-600">📄</span>
@@ -119,7 +120,7 @@ export default function ActionButtons({
             </div>
           </div>
         </div>
-      )}
+      ) : null}
 
       {disabled && (
         <p className="text-center text-sm text-gray-500 mt-3">

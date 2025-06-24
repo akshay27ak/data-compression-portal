@@ -7,43 +7,27 @@ export default function DownloadSection({ result, fileName, fileId }) {
   const [isDownloading, setIsDownloading] = useState(false)
 
   const getDownloadFileName = () => {
-    // PRIORITY 1: Use the filename from the backend result (this is the correct one!)
+    console.log(`🔍 DownloadSection Debug - Full result object:`, result)
+    console.log(`🔍 result.fileName:`, result.fileName)
+    console.log(`🔍 result.processedFile:`, result.processedFile)
+
+    // PRIORITY 1: Use the filename from the backend result (this is the ACTUAL filename created!)
     if (result.fileName) {
-      console.log(`🔍 Using backend filename: ${result.fileName}`)
+      console.log(`✅ Using backend filename: ${result.fileName}`)
       return result.fileName
     }
 
-    // PRIORITY 2: Generate filename based on action and algorithm (fallback)
-    if (!fileName) return "processed_file"
-
-    const nameWithoutExt = fileName.split(".").slice(0, -1).join(".")
-    let extension
-
-    if (result.action === "compress") {
-      extension = result.algorithm === "jpeg" ? "jpeg" : "bin"
-    } else {
-      // For decompression, restore original extension
-      if (result.algorithm === "jpeg") {
-        extension = "png"
-      } else {
-        // Extract original extension from compressed filename
-        if (fileName.includes("_compressed_")) {
-          const beforeCompressed = fileName.split("_compressed_")[0]
-          const lastDotIndex = beforeCompressed.lastIndexOf(".")
-          if (lastDotIndex !== -1) {
-            extension = beforeCompressed.substring(lastDotIndex + 1)
-          } else {
-            extension = "txt" // default
-          }
-        } else {
-          extension = "txt" // default for decompression
-        }
-      }
+    // PRIORITY 2: Use processedFile.name from result (backup)
+    if (result.processedFile && result.processedFile.name) {
+      console.log(`✅ Using processedFile name: ${result.processedFile.name}`)
+      return result.processedFile.name
     }
 
-    const generatedName = `${nameWithoutExt}_${result.action}ed_${result.algorithm}.${extension}`
-    console.log(`🔍 Generated filename: ${generatedName}`)
-    return generatedName
+    // PRIORITY 3: Only as absolute fallback - should never reach here if backend works correctly
+    console.log(`⚠️ Backend filename not available, this should not happen!`)
+    console.log(`⚠️ Available result keys:`, Object.keys(result))
+    console.log(`⚠️ fileName prop:`, fileName)
+    return fileName || "processed_file"
   }
 
   const getFileIcon = () => {
@@ -84,6 +68,8 @@ export default function DownloadSection({ result, fileName, fileId }) {
         switch (ext) {
           case "txt":
             return "Text file (restored)"
+          case "bin":
+            return "Binary file (restored)"
           case "png":
             return "PNG image (restored)"
           case "jpg":
@@ -106,9 +92,16 @@ export default function DownloadSection({ result, fileName, fileId }) {
 
     try {
       const downloadFileName = getDownloadFileName()
-      console.log(`📥 Downloading file: ${downloadFileName}`)
+      console.log(`📥 Starting download:`)
+      console.log(`📥 - fileId: ${fileId}`)
+      console.log(`📥 - downloadFileName: ${downloadFileName}`)
+      console.log(`📥 - result.action: ${result.action}`)
+      console.log(`📥 - result.algorithm: ${result.algorithm}`)
+
       await downloadFile(fileId, downloadFileName)
+      console.log(`✅ Download completed successfully`)
     } catch (error) {
+      console.error(`❌ Download failed:`, error)
       alert(`Download failed: ${error.message}`)
     } finally {
       setIsDownloading(false)
