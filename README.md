@@ -7,7 +7,7 @@ A comprehensive web application for file compression and decompression using var
 - **Frontend (Vercel)**: https://data-compression-portal-tawny.vercel.app
 - **Backend API (Railway)**: https://data-compression-portal-production.up.railway.app
 
-## Live Demo 
+## Demo Video
 
 [View the deployed application here](https://drive.google.com/drive/u/0/folders/10KxajoXuBNVrQwWgkD7KwPZV9Ize2TcP)
 

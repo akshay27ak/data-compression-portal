@@ -67,7 +67,6 @@ export default function CompressPage() {
     const validation = validateFileType(file)
     if (!validation.isValid) {
       setError(validation.error)
-      console.log("File validation failed:", validation.error)
       return 
     }
 
