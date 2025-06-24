@@ -108,7 +108,7 @@ A comprehensive web application for file compression and decompression using var
 
 Create a `.env.local` file in the frontend directory:
 \`\`\`env
-NEXT_PUBLIC_API_URL=http://localhost:5000
+NEXT_PUBLIC_API_URL=`http://localhost:5000`
 \`\`\`
 
 ## Usage Guide

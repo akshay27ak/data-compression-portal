@@ -1,8 +1,3 @@
-/**
- * Run-Length Encoding (RLE) Implementation
- * Simple and efficient compression for data with repeated sequences
- */
-
 async function compress(data) {
   try {
     if (data.length === 0) {
@@ -16,12 +11,10 @@ async function compress(data) {
       const currentByte = data[i]
       let count = 1
 
-      // Count consecutive identical bytes
       while (i + count < data.length && data[i + count] === currentByte && count < 255) {
         count++
       }
 
-      // Store count and byte value
       compressed.push(count)
       compressed.push(currentByte)
 
@@ -50,7 +43,6 @@ async function decompress(compressedData) {
       const count = compressedData[i]
       const value = compressedData[i + 1]
 
-      // Repeat the value 'count' times
       for (let j = 0; j < count; j++) {
         decompressed.push(value)
       }

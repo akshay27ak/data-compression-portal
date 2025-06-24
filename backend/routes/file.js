@@ -4,7 +4,6 @@ const fs = require("fs")
 
 const router = express.Router()
 
-// Get file information
 router.get("/:fileId", (req, res) => {
   try {
     const { fileId } = req.params
@@ -15,12 +14,10 @@ router.get("/:fileId", (req, res) => {
       })
     }
 
-    // Check in processed files first
     let metadataPath = path.join("processed", `${fileId}.json`)
     let isProcessedFile = true
 
     if (!fs.existsSync(metadataPath)) {
-      // Check in uploads
       metadataPath = path.join("uploads", `${fileId}.json`)
       isProcessedFile = false
     }
@@ -33,7 +30,6 @@ router.get("/:fileId", (req, res) => {
 
     const fileMetadata = JSON.parse(fs.readFileSync(metadataPath, "utf8"))
 
-    // Return file information
     const fileInfo = {
       fileId: fileMetadata.fileId,
       fileName: fileMetadata.originalName || fileMetadata.fileName,

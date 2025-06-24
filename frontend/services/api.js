@@ -1,6 +1,5 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://data-compression-portal-production.up.railway.app"
 
-// Upload file
 export const uploadFile = async (file) => {
   const formData = new FormData()
   formData.append("file", file)
@@ -18,7 +17,6 @@ export const uploadFile = async (file) => {
   return response.json()
 }
 
-// Compress file
 export const compressFile = async (fileId, algorithm) => {
   const response = await fetch(`${API_BASE_URL}/compress`, {
     method: "POST",
@@ -39,7 +37,6 @@ export const compressFile = async (fileId, algorithm) => {
   return response.json()
 }
 
-// Decompress file - FIX: Make sure this calls the correct endpoint
 export const decompressFile = async (fileId, algorithm) => {
   const response = await fetch(`${API_BASE_URL}/compress/decompress`, {
     method: "POST",
@@ -60,7 +57,6 @@ export const decompressFile = async (fileId, algorithm) => {
   return response.json()
 }
 
-// Download file
 export const downloadFile = async (fileId, fileName) => {
   const response = await fetch(`${API_BASE_URL}/download/${fileId}`)
 
@@ -80,7 +76,6 @@ export const downloadFile = async (fileId, fileName) => {
   document.body.removeChild(a)
 }
 
-// Get file info
 export const getFileInfo = async (fileId) => {
   const response = await fetch(`${API_BASE_URL}/file/${fileId}`)
 

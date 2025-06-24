@@ -2,7 +2,6 @@
 
 export default function AlgorithmEfficiencyDemo({ fileType, originalSize }) {
   const getAlgorithmEfficiency = (algorithm, fileType, size) => {
-    // Simulate realistic compression ratios based on algorithm and file type
     const efficiencyMap = {
       huffman: {
         text: { ratio: 45, speed: 2.1, explanation: "Excellent for text due to character frequency analysis" },

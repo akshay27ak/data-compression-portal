@@ -37,10 +37,7 @@ export default function FileUpload({ onFileSelect, selectedFile, fileStatus }) {
     if (!file) return "📁"
     if (file.type.startsWith("text/")) return "📄"
     if (file.type.startsWith("image/")) return "🖼️"
-    if (file.type.startsWith("video/")) return "🎥"
-    if (file.type.startsWith("audio/")) return "🎵"
-    if (file.type.includes("pdf")) return "📕"
-    if (file.type.includes("zip") || file.type.includes("rar")) return "🗜️"
+    if (file.type.startsWith("binary/")) return "💾"
     return "📄"
   }
 

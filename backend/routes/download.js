@@ -4,7 +4,6 @@ const fs = require("fs")
 
 const router = express.Router()
 
-// Download endpoint with enhanced file handling
 router.get("/:fileId", (req, res) => {
   try {
     const { fileId } = req.params
@@ -16,7 +15,6 @@ router.get("/:fileId", (req, res) => {
       })
     }
 
-    // Check both uploads and processed directories for metadata
     let metadataPath = path.join("uploads", `${fileId}.json`)
     let isFromProcessed = false
 
@@ -33,7 +31,6 @@ router.get("/:fileId", (req, res) => {
 
     const metadata = JSON.parse(fs.readFileSync(metadataPath, "utf8"))
 
-    // Get the actual file path
     let filePath
     if (isFromProcessed) {
       filePath = metadata.filePath || metadata.processedFile?.path
@@ -47,25 +44,18 @@ router.get("/:fileId", (req, res) => {
       })
     }
 
-    // Determine the download filename
     let downloadFilename
     if (filename) {
-      // Use the filename provided by the frontend (from backend response)
       downloadFilename = filename
     } else if (isFromProcessed && metadata.processedFile?.name) {
-      // Use the processed file name from metadata
       downloadFilename = metadata.processedFile.name
     } else {
-      // Fallback to original name or generic name
       downloadFilename = metadata.originalName || metadata.fileName || "download"
     }
 
-    console.log(`📥 Downloading file: ${downloadFilename} from ${filePath}`)
 
-    // Set proper headers for download
     res.setHeader("Content-Disposition", `attachment; filename="${downloadFilename}"`)
 
-    // Set content type based on file extension
     const ext = path.extname(downloadFilename).toLowerCase()
     switch (ext) {
       case ".txt":
@@ -85,7 +75,6 @@ router.get("/:fileId", (req, res) => {
         res.setHeader("Content-Type", "application/octet-stream")
     }
 
-    // Stream the file
     const fileStream = fs.createReadStream(filePath)
     fileStream.pipe(res)
 

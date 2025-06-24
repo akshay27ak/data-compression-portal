@@ -15,7 +15,6 @@ export default function CompressionSettings() {
     setIsProcessing(true)
     setProgress(0)
 
-    // Simulate compression process with progress updates
     for (let i = 0; i <= 100; i += 10) {
       setProgress(i)
       await new Promise((resolve) => setTimeout(resolve, 200))

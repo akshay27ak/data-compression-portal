@@ -17,7 +17,6 @@ export default function CompressionResult({ result }) {
     if (result.action === "compress") {
       return (((result.originalSize - result.processedSize) / result.originalSize) * 100).toFixed(1)
     } else {
-      // For decompression, show expansion ratio
       return (((result.processedSize - result.originalSize) / result.originalSize) * 100).toFixed(1)
     }
   }
@@ -42,7 +41,6 @@ export default function CompressionResult({ result }) {
       if (ratio >= 15) return { label: "Fair", color: "orange", icon: "👌" }
       return { label: "Poor", color: "red", icon: "⚠️" }
     } else {
-      // For decompression, success is just completing without errors
       return { label: "Success", color: "green", icon: "✅" }
     }
   }

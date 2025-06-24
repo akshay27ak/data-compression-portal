@@ -7,26 +7,15 @@ export default function DownloadSection({ result, fileName, fileId }) {
   const [isDownloading, setIsDownloading] = useState(false)
 
   const getDownloadFileName = () => {
-    console.log(`🔍 DownloadSection Debug - Full result object:`, result)
-    console.log(`🔍 result.fileName:`, result.fileName)
-    console.log(`🔍 result.processedFile:`, result.processedFile)
 
-    // PRIORITY 1: Use the filename from the backend result (this is the ACTUAL filename created!)
     if (result.fileName) {
-      console.log(`✅ Using backend filename: ${result.fileName}`)
       return result.fileName
     }
 
-    // PRIORITY 2: Use processedFile.name from result (backup)
     if (result.processedFile && result.processedFile.name) {
-      console.log(`✅ Using processedFile name: ${result.processedFile.name}`)
       return result.processedFile.name
     }
 
-    // PRIORITY 3: Only as absolute fallback - should never reach here if backend works correctly
-    console.log(`⚠️ Backend filename not available, this should not happen!`)
-    console.log(`⚠️ Available result keys:`, Object.keys(result))
-    console.log(`⚠️ fileName prop:`, fileName)
     return fileName || "processed_file"
   }
 
@@ -92,16 +81,11 @@ export default function DownloadSection({ result, fileName, fileId }) {
 
     try {
       const downloadFileName = getDownloadFileName()
-      console.log(`📥 Starting download:`)
-      console.log(`📥 - fileId: ${fileId}`)
-      console.log(`📥 - downloadFileName: ${downloadFileName}`)
-      console.log(`📥 - result.action: ${result.action}`)
-      console.log(`📥 - result.algorithm: ${result.algorithm}`)
 
       await downloadFile(fileId, downloadFileName)
-      console.log(`✅ Download completed successfully`)
+      console.log(`Download completed successfully`)
     } catch (error) {
-      console.error(`❌ Download failed:`, error)
+      console.error(`Download failed:`, error)
       alert(`Download failed: ${error.message}`)
     } finally {
       setIsDownloading(false)

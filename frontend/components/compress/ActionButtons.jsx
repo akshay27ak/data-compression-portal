@@ -8,7 +8,7 @@ export default function ActionButtons({
   disabled,
   selectedAlgorithm,
   fileStatus,
-  hasFile, // NEW: Add this prop to know if file is uploaded
+  hasFile, 
 }) {
   const canCompress = !fileStatus?.isCompressed && !disabled
   const canDecompress = fileStatus?.isCompressed && !disabled

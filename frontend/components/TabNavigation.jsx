@@ -12,11 +12,6 @@ export default function TabNavigation({ activeTab, onTabChange }) {
       name: "Algorithms",
       icon: "📋",
     },
-    // {
-    //   id: "metrics",
-    //   name: "Metrics",
-    //   icon: "📊",
-    // },
   ]
 
   return (

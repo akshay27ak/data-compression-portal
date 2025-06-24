@@ -1,8 +1,3 @@
-/**
- * Huffman Coding Implementation - FIXED DECOMPRESSION
- * Research-based implementation using frequency analysis and binary tree construction
- */
-
 class HuffmanNode {
   constructor(char, freq, left = null, right = null) {
     this.char = char
@@ -92,18 +87,15 @@ function buildFrequencyTable(data) {
 function buildHuffmanTree(frequencies) {
   const heap = new MinHeap()
 
-  // Create leaf nodes for each character
   for (const [char, freq] of Object.entries(frequencies)) {
     heap.insert(new HuffmanNode(Number.parseInt(char), freq))
   }
 
-  // Handle single character case
   if (heap.size() === 1) {
     const node = heap.extractMin()
     return new HuffmanNode(null, node.freq, node, null)
   }
 
-  // Build tree bottom-up
   while (heap.size() > 1) {
     const left = heap.extractMin()
     const right = heap.extractMin()
@@ -119,7 +111,7 @@ function generateCodes(root) {
 
   function traverse(node, code) {
     if (node.isLeaf()) {
-      codes[node.char] = code || "0" // Handle single character case
+      codes[node.char] = code || "0" 
       return
     }
     if (node.left) traverse(node.left, code + "0")
@@ -133,7 +125,6 @@ function generateCodes(root) {
 function serializeTree(node) {
   if (!node) return ""
   if (node.isLeaf()) {
-    // Use a safe encoding for the character
     return "1" + node.char.toString().padStart(3, "0")
   }
   return "0" + serializeTree(node.left) + serializeTree(node.right)
@@ -144,7 +135,6 @@ function deserializeTree(data, index = { value: 0 }) {
 
   if (data[index.value] === "1") {
     index.value++
-    // Read the 3-digit character code
     const charStr = data.substr(index.value, 3)
     const char = Number.parseInt(charStr, 10)
     index.value += 3
@@ -163,25 +153,19 @@ async function compress(data) {
       return Buffer.from([])
     }
 
-    // Build frequency table
     const frequencies = buildFrequencyTable(data)
 
-    // Build Huffman tree
     const root = buildHuffmanTree(frequencies)
 
-    // Generate codes
     const codes = generateCodes(root)
 
-    // Serialize tree for storage
     const serializedTree = serializeTree(root)
 
-    // Encode data
     let encodedBits = ""
     for (let i = 0; i < data.length; i++) {
       encodedBits += codes[data[i]]
     }
 
-    // Convert bits to bytes
     const padding = 8 - (encodedBits.length % 8)
     if (padding !== 8) {
       encodedBits += "0".repeat(padding)
@@ -193,8 +177,6 @@ async function compress(data) {
       encodedBytes.push(byte)
     }
 
-    // Create compressed data format:
-    // [original_length(4 bytes)][tree_length(4 bytes)][tree_data][padding(1 byte)][encoded_data]
     const originalLengthBuffer = Buffer.alloc(4)
     originalLengthBuffer.writeUInt32BE(data.length, 0)
 
@@ -219,40 +201,31 @@ async function decompress(compressedData) {
 
     let offset = 0
 
-    // Read original length
     const originalLength = compressedData.readUInt32BE(offset)
     offset += 4
 
-    // Read tree length
     const treeLength = compressedData.readUInt32BE(offset)
     offset += 4
 
-    // Read serialized tree
     const serializedTree = compressedData.slice(offset, offset + treeLength).toString("utf8")
     offset += treeLength
 
-    // Read padding
     const padding = compressedData[offset]
     offset += 1
 
-    // Read encoded data
     const encodedData = compressedData.slice(offset)
 
-    // Deserialize tree
     const root = deserializeTree(serializedTree)
 
-    // Convert bytes back to bits
     let bits = ""
     for (let i = 0; i < encodedData.length; i++) {
       bits += encodedData[i].toString(2).padStart(8, "0")
     }
 
-    // Remove padding
     if (padding > 0) {
       bits = bits.slice(0, -padding)
     }
 
-    // Decode using tree
     const decoded = []
     let current = root
 
@@ -260,7 +233,7 @@ async function decompress(compressedData) {
       if (current.isLeaf()) {
         decoded.push(current.char)
         current = root
-        i-- // Re-process this bit with the new current node
+        i-- 
         continue
       }
 
@@ -271,7 +244,6 @@ async function decompress(compressedData) {
       }
     }
 
-    // Handle last character if needed
     if (current && current.isLeaf() && decoded.length < originalLength) {
       decoded.push(current.char)
     }

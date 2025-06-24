@@ -5,7 +5,6 @@ import Header from "./Header"
 import TabNavigation from "./TabNavigation"
 import CompressPage from "./pages/CompressPage"
 import AlgorithmsPage from "./pages/AlgorithmsPage"
-// import MetricsPage from "./pages/MetricsPage"
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("compress")
@@ -16,8 +15,6 @@ export default function App() {
         return <CompressPage />
       case "algorithms":
         return <AlgorithmsPage />
-      // case "metrics":
-      //   return <MetricsPage />
       default:
         return <CompressPage />
     }

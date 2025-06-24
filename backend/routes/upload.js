@@ -7,7 +7,6 @@ const { detectCompressedFile } = require("../utils/compressionDetector")
 
 const router = express.Router()
 
-// Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const uploadDir = "uploads"
@@ -25,54 +24,43 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage })
 
-// ENHANCED: Find original compression metadata for compressed files
 const findOriginalCompressionMetadata = (fileName) => {
-  console.log(`🔍 Searching for original compression metadata for: ${fileName}`)
 
-  // Check if this is our compressed file pattern
   if (!fileName.includes("_compressed_")) {
-    console.log(`❌ Not a compressed file pattern`)
     return null
   }
 
   try {
-    // Look through processed directory for matching compression metadata
     const processedDir = "processed"
     if (!fs.existsSync(processedDir)) {
-      console.log(`❌ Processed directory doesn't exist`)
       return null
     }
 
     const files = fs.readdirSync(processedDir)
     const metadataFiles = files.filter((file) => file.endsWith(".json"))
 
-    console.log(`🔍 Found ${metadataFiles.length} metadata files to check`)
 
     for (const metadataFile of metadataFiles) {
       try {
         const metadataPath = path.join(processedDir, metadataFile)
         const metadata = JSON.parse(fs.readFileSync(metadataPath, "utf8"))
 
-        // Check if this metadata is for a compression action and matches our file
         if (metadata.action === "compress" && metadata.processedFile) {
           const processedFileName = path.basename(metadata.processedFile.name)
-          console.log(`🔍 Checking: ${processedFileName} vs ${fileName}`)
 
           if (processedFileName === fileName) {
-            console.log(`✅ Found matching compression metadata!`)
             return metadata
           }
         }
       } catch (err) {
-        console.log(`⚠️ Error reading metadata file ${metadataFile}:`, err.message)
+        console.log(`Error reading metadata file ${metadataFile}:`, err.message)
         continue
       }
     }
 
-    console.log(`❌ No matching compression metadata found`)
     return null
   } catch (error) {
-    console.log(`❌ Error searching for compression metadata:`, error.message)
+    console.log(`Error searching for compression metadata:`, error.message)
     return null
   }
 }
@@ -89,11 +77,9 @@ router.post("/", upload.single("file"), (req, res) => {
     const fileSize = req.file.size
     const mimeType = req.file.mimetype
 
-    console.log(`📤 File uploaded: ${originalName} (${fileSize} bytes, ${mimeType})`)
+    console.log(`File uploaded: ${originalName} (${fileSize} bytes, ${mimeType})`)
 
-    // Detect if this is a compressed file
     const compressionInfo = detectCompressedFile(filePath, originalName)
-    console.log(`🔍 Compression detection result:`, compressionInfo)
 
     const fileMetadata = {
       fileId: fileId,
@@ -113,16 +99,12 @@ router.post("/", upload.single("file"), (req, res) => {
       compressionType: compressionInfo.isCompressed ? "system" : "original",
     }
 
-    // ENHANCED: If this is a compressed file, try to find original compression metadata
     if (compressionInfo.isCompressed) {
-      console.log(`🗜️ Compressed file detected, searching for original metadata...`)
 
       const originalCompressionMetadata = findOriginalCompressionMetadata(originalName)
 
       if (originalCompressionMetadata && originalCompressionMetadata.compressionMetadata) {
-        console.log(`✅ Found original compression metadata!`)
 
-        // Use the ORIGINAL file metadata from when it was first compressed
         fileMetadata.originalFileMetadata = {
           extension: originalCompressionMetadata.compressionMetadata.originalExtension,
           baseName: originalCompressionMetadata.compressionMetadata.originalBaseName,
@@ -130,18 +112,14 @@ router.post("/", upload.single("file"), (req, res) => {
           fullName: originalCompressionMetadata.compressionMetadata.originalFullName,
         }
 
-        // Store reference to original compression metadata
         fileMetadata.linkedCompressionMetadata = {
           fileId: originalCompressionMetadata.fileId,
           originalFile: originalCompressionMetadata.originalFile,
           compressionMetadata: originalCompressionMetadata.compressionMetadata,
         }
 
-        console.log(`📋 Using original file metadata:`, fileMetadata.originalFileMetadata)
       } else {
-        console.log(`⚠️ No original compression metadata found, using filename extraction`)
 
-        // Fallback: extract from filename pattern
         if (originalName.includes("_compressed_")) {
           const beforeCompressed = originalName.split("_compressed_")[0]
           const lastDotIndex = beforeCompressed.lastIndexOf(".")
@@ -162,7 +140,6 @@ router.post("/", upload.single("file"), (req, res) => {
               fullName: beforeCompressed,
             }
           } else {
-            // Default fallback
             fileMetadata.originalFileMetadata = {
               extension: ".bin",
               baseName: beforeCompressed,
@@ -171,7 +148,6 @@ router.post("/", upload.single("file"), (req, res) => {
             }
           }
         } else {
-          // Default for compressed files
           fileMetadata.originalFileMetadata = {
             extension: compressionInfo.originalExt || ".bin",
             baseName: path.parse(originalName).name,
@@ -181,7 +157,6 @@ router.post("/", upload.single("file"), (req, res) => {
         }
       }
     } else {
-      // For original (non-compressed) files
       fileMetadata.originalFileMetadata = {
         extension: path.extname(originalName),
         baseName: path.parse(originalName).name,
@@ -190,12 +165,9 @@ router.post("/", upload.single("file"), (req, res) => {
       }
     }
 
-    // Save metadata
     const metadataPath = path.join("uploads", `${fileId}.json`)
     fs.writeFileSync(metadataPath, JSON.stringify(fileMetadata, null, 2))
 
-    console.log(`✅ File uploaded successfully: ${fileId}`)
-    console.log(`📋 Final metadata:`, fileMetadata)
 
     res.json({
       fileId: fileId,

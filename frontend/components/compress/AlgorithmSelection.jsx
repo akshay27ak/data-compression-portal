@@ -17,7 +17,7 @@ export default function AlgorithmSelection({
       case "text":
         return "huffman"
       case "image":
-        return "jpeg" // Changed from "rle" to "jpeg" for images
+        return "jpeg" 
       case "binary":
         return "lz77"
       default:

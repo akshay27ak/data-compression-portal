@@ -6,7 +6,6 @@ import { algorithms } from "../../data/algorithmsData"
 export default function AlgorithmSelector({ selectedAlgorithm, onAlgorithmChange }) {
   const [isOpen, setIsOpen] = useState(false)
 
-  // Default to huffman if no selection or invalid selection
   const currentAlgorithm = selectedAlgorithm || "huffman"
   const selectedAlgo = algorithms.find((algo) => algo.id === currentAlgorithm)
 

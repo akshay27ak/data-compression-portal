@@ -8,10 +8,9 @@ export default function ErrorFeedback({ error, onClose }) {
   useEffect(() => {
     if (error) {
       setIsVisible(true)
-      // Auto-hide after 5 seconds
       const timer = setTimeout(() => {
         setIsVisible(false)
-        setTimeout(onClose, 300) // Wait for animation to complete
+        setTimeout(onClose, 300) 
       }, 5000)
 
       return () => clearTimeout(timer)
